@@ -56,6 +56,6 @@ Drugim istotnym ryzykiem jest **zbyt późne wykrycie błędów**. Testy powinny
 
 Ze względu na krótki harmonogram ważne jest również **kontrolowanie zakresu projektu**. W pierwszej kolejności należy zrealizować funkcje niezbędne do działania gry, a dopiero później funkcje dodatkowe.
 
-## Podsumowanie
+# Podsumowanie
 
 Zastosowanie Node.js i Socket.IO pozwala stosunkowo szybko stworzyć aplikację wykorzystującą komunikację w czasie rzeczywistym. Najważniejsze dla powodzenia projektu będzie wczesne przetestowanie komunikacji klient–serwer, prawidłowa synchronizacja stanu gry oraz utrzymanie zakresu projektu w ramach dostępnego czasu.
