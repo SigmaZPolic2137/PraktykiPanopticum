@@ -7,12 +7,12 @@
 	</head>
 
 	<body>
-		<h1>Welcome to home page</h1>
+		<h1>Witaj na stronie głównej</h1>
 
-		<h2>Live messages: </h2>
+		<h2>Wiadomości na żywo: </h2>
 		<div id="messages"></div>
 
-		<button id="clear-button" onclick="ClearMessages()">Clear</button>
+		<button id="clear-button" onclick="ClearMessages()">Wyczyść</button>
 
 		<script src="/socket.io/socket.io.js"></script>
     	<script>
@@ -21,9 +21,7 @@
 			const Messages = document.getElementById("messages");
 
 			function ClearMessages() {
-				while (Messages.firstChild) {
-					Messages.removeChild(Messages.firstChild);
-				}
+				Messages.innerHTML = "";
 			}
 
 			Socket.on("broadcastMessage", (Data) => {
@@ -32,7 +30,7 @@
 
 				Node.append(TextNode);
 				Messages.append(Node);
-			})
+			});
     	</script>
 	</body>
 </html>

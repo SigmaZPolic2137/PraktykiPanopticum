@@ -1,9 +1,8 @@
 import Express from "express";
-import {createServer} from "http";
-import {Server} from "socket.io";
-
+import { createServer } from "http";
+import { Server } from "socket.io";
 import Path from "path";
-import {fileURLToPath} from "url";
+import { fileURLToPath } from "url";
 
 const App = Express();
 const Http = createServer(App);
@@ -14,36 +13,40 @@ const __dirname = Path.dirname(__filename);
 
 App.use(Express.static(__dirname));
 
-const ActiveDevices = new Set(); 
+function UpdateHosts() {
+    const AllSockets = Array.from(IO.sockets.sockets.keys());
+
+    IO.to("hosts").emit("hostDataUpdate", {
+        Count: IO.sockets.sockets.size,
+        Devices: AllSockets
+    });
+}
 
 IO.on("connection", (Socket) => {
-    console.log("Device connected: " + Socket.id + "!");
-    
-    ActiveDevices.add(Socket.id);
+    console.log(`Device connected: ${Socket.id}!`);
 
-    Socket.emit("currentDevices", {
-		Devices: Array.from(ActiveDevices)
-	});
+    UpdateHosts();
 
-    Socket.broadcast.emit("deviceConnect", {ID: Socket.id});
+    Socket.on("registerAsHost", () => {
+        Socket.join("hosts");
+        UpdateHosts();
+    });
 
     Socket.on("disconnect", (Reason) => {
-        console.log("Device disconnected: " + Socket.id + ", " + Reason + "!");
-        
-        ActiveDevices.delete(Socket.id);
-        
-        IO.emit("deviceDisconnect", {ID: Socket.id});
+        console.log(`Device disconnected: ${Socket.id}, ${Reason}!`);
+        UpdateHosts();
     });
 
     Socket.on("sendMessage", (Data) => {
-        console.log("Message received: " + Data.Message + ".");
-        IO.emit("broadcastMessage", {Message: Data.Message});
+        console.log(`Message received: ${Data.Message}.`);
+        IO.emit("broadcastMessage", {
+            Message: Data.Message
+        });
     });
 });
 
-
-const Port = 3000
+const Port = 3000;
 
 Http.listen(Port, "0.0.0.0", () => {
-	console.log("Server running on port " + Port + ".")
-})
+    console.log(`Server running on port ${Port}.`);
+});
