@@ -1,4 +1,4 @@
-# Zespół:
+# Zespół
 1. **Łukasz Jabłoński** - Lider, Programista.
 2. **Maksymilian Walczuk** - Projektant, Grafik, Tester.
 3. **Liam Jenees** - Programista, Tester.
@@ -11,7 +11,7 @@
 2. **Wersja beta** – działająca gra, testy oraz praca nad grafiką.
 3. **Wersja finałowa** – ostateczne poprawki i przygotowanie aplikacji do publikacji.
 
-## Wykorzystane technologie
+# Wykorzystane technologie
 
 Projekt wykorzystuje bibliotekę **Socket.IO** w języku **JavaScript**, działającą w środowisku **Node.js**.
 
