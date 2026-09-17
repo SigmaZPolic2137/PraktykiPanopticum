@@ -15,6 +15,8 @@ jak sie połączyć (android chrom):
 5. jeżeli jest tak samo jak po otworzeniu localhosta na pc to całuski
 67. jeżeli strona się długo ładuje lub wyświetla dziwny błąd gdy wpisałeś poprawny adres to pomyśl o zmania na hotspota, może to być wina ustawień rutera
 
+aby otworzyć panel hosta wystarczy dopisać /host.html do adresu na pasku
+
 glhf bezrobotni
 
 sprzedaj mi ten hotspot
