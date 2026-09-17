@@ -3,15 +3,36 @@
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>socket.io test</title>
+		<title>Strona główna</title>
 	</head>
 
 	<body>
-		niewiem psze sie osobno
+		<h1>Welcome to home page</h1>
+
+		<h2>Live messages: </h2>
+		<div id="messages"></div>
+
+		<button id="clear-button" onclick="ClearMessages()">Clear</button>
 
 		<script src="/socket.io/socket.io.js"></script>
     	<script>
-        	const Socket = io(); 
+        	const Socket = io();
+
+			const Messages = document.getElementById("messages");
+
+			function ClearMessages() {
+				while (Messages.firstChild) {
+					Messages.removeChild(Messages.firstChild);
+				}
+			}
+
+			Socket.on("broadcastMessage", (Data) => {
+				const Node = document.createElement("p");
+				const TextNode = document.createTextNode(Data.Message);
+
+				Node.append(TextNode);
+				Messages.append(Node);
+			})
     	</script>
 	</body>
 </html>

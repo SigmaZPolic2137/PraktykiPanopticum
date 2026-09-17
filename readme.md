@@ -9,7 +9,7 @@ jak to uruchomić (windows 11 2026 working no virus free):
 
 jak sie połączyć (android chrom):
 1. utwórz nowe okienko wiersza poleceń i wpisz "ipconfig"
-2. doomscrolluj aż znajdziesz "Wireless LAN adapter Wi-Fi 2" lub podobny segment (lub ethernet gdy ruter jest bezpośrednio połączony do pc)
+2. doomscrolluj aż znajdziesz segment o nazwie "Wireless LAN adapter Wi-Fi 2" lub podobny (lub ethernet gdy ruter jest bezpośrednio połączony do pc)
 3. na telofonie połącz się z tym samym wifi co jest pc połączony
 4. otwórz przeglądarkę i w pasek adresu spisz "http://ip:3000" gdzie ip jest IPv4 Address z segmentu z drugiego (2) punktu
 5. jeżeli jest tak samo jak po otworzeniu localhosta na pc to całuski
@@ -18,4 +18,5 @@ jak sie połączyć (android chrom):
 glhf bezrobotni
 
 sprzedaj mi ten hotspot
+
 przyniosłem własny router

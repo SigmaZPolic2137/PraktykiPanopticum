@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pl-PL">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Panel hosta</title>
+	</head>
+
+	<body>
+		<h1>Welcome to host panel</h1>
+
+		<h2>Connected devices:</h2>
+		<p id="connected-count">Count: 0</p>
+		<div id="device-list"></div>
+
+		<h2>Send messege:</h2>
+		<input id="typed-message" type="text" placeholder="Type message here...">
+		<button id="send-message-button" onclick="SendMessage()">Send</button>
+
+		<script src="/socket.io/socket.io.js"></script>
+    	<script>
+        	const Socket = io();
+
+			const DeviceList = document.getElementById("device-list");
+			const ConnectedCount = document.getElementById("connected-count");
+
+			const TypedMessege = document.getElementById("typed-message");
+			const SendMessegeButton = document.getElementById("send-message-button");
+
+			let ConnectedDevices = 0;
+
+			function UpdateConnectedCount() {
+				ConnectedCount.textContent = "Count: " + ConnectedDevices; 
+			}
+
+			function AddToDeviceList(SocketID) {
+				ConnectedDevices += 1;
+
+				const Node = document.createElement("p");
+				const TextNode = document.createTextNode(SocketID);
+
+				Node.append(TextNode);
+				DeviceList.append(Node);
+				
+				UpdateConnectedCount()
+			}
+
+			function RemoveFromDeviceList(SocketID) {
+				let Removed = false;
+
+				for (let Element of DeviceList.childNodes) {
+					if (Element.textContent === SocketID) {
+						Element.remove();
+						Removed = true
+						break;
+					}
+				}
+				if (Removed) {
+					ConnectedDevices -= 1;
+					UpdateConnectedCount()
+				}
+			}
+
+			function SendMessage() {
+				Socket.emit("sendMessage", {Message: TypedMessege.value});
+			}
+
+			Socket.on("currentDevices", (Data) => {
+				DeviceList.innerHTML = "";
+				ConnectedDevices = 0;
+				
+				Data.Devices.forEach(id => {
+					AddToDeviceList(id);
+				});
+			});
+
+			Socket.on("deviceConnect", (Data) => {
+				AddToDeviceList(Data.ID);
+			})
+
+			Socket.on("deviceDisconnect", (Data) => {
+				RemoveFromDeviceList(Data.ID);
+			})
+    	</script>
+	</body>
+</html>
