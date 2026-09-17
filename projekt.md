@@ -1,7 +1,7 @@
 # Zespół:
-1. Łukasz Jabłoński: Lider, Programista.
-2. Maksymilian Walczuk: Projektant, Grafik, Tester.
-3. Liam Jenees: Programista, Tester.
+1. **Łukasz Jabłoński** - Lider, Programista.
+2. **Maksymilian Walczuk** - Projektant, Grafik, Tester.
+3. **Liam Jenees** - Programista, Tester.
 
 # Plan projektu
 
