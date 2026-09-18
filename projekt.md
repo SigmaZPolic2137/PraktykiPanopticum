@@ -37,16 +37,16 @@ Rozwiązania te umożliwiają komunikację w czasie rzeczywistym, jednak wymagaj
 
 # Analiza ryzyka
 
-| Ryzyko                               | Prawdopodobieństwo | Wpływ  | Sposób ograniczenia                                                             |
-| ------------------------------------ | ------------------ | ------ | ------------------------------------------------------------------------------- |
-| Problemy z komunikacją klient–serwer | Średnie            | Wysoki | Testowanie komunikacji już podczas tworzenia prototypu                          |
-| Problemy z synchronizacją stanu gry  | Wysokie            | Wysoki | Przechowywanie głównego stanu gry po stronie serwera i walidacja danych         |
-| Utrata połączenia przez gracza       | Średnie            | Wysoki | Obsługa reconnectów i ponowna synchronizacja stanu gry                          |
-| Problemy z wydajnością               | Średnie            | Wysoki | Ograniczenie liczby komunikatów i testy obciążeniowe                            |
-| Błędy wykryte pod koniec projektu    | Wysokie            | Wysoki | Regularne testowanie każdej wersji                                              |
-| Opóźnienia w przygotowaniu grafiki   | Średnie            | Średni | Ustalenie podstawowego zakresu grafik potrzebnych do publikacji                 |
-| Zbyt duży zakres projektu            | Wysokie            | Wysoki | Ustalenie funkcji wymaganych dla wersji beta i ograniczenie funkcji dodatkowych |
-| Problemy podczas wdrożenia           | Średnie            | Wysoki | Wykonanie próbnego wdrożenia przed wersją finałową                              |
+| Ryzyko                               | Sposób ograniczenia                                                             |
+| ------------------------------------ | ------------------------------------------------------------------------------- |
+| Problemy z komunikacją klient–serwer | Testowanie komunikacji już podczas tworzenia prototypu                          |
+| Problemy z synchronizacją stanu gry  | Przechowywanie głównego stanu gry po stronie serwera i walidacja danych         |
+| Utrata połączenia przez gracza       | Obsługa reconnectów i ponowna synchronizacja stanu gry                          |
+| Problemy z wydajnością               | Ograniczenie liczby komunikatów i testy obciążeniowe                            |
+| Błędy wykryte pod koniec projektu    | Regularne testowanie każdej wersji                                              |
+| Opóźnienia w przygotowaniu grafiki   | Ustalenie podstawowego zakresu grafik potrzebnych do publikacji                 |
+| Zbyt duży zakres projektu            | Ustalenie funkcji wymaganych dla wersji beta i ograniczenie funkcji dodatkowych |
+| Problemy podczas wdrożenia           | Wykonanie próbnego wdrożenia przed wersją finałową                              |
 
 ### Najważniejsze ryzyka
 
