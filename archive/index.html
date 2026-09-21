@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pl-PL">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Strona główna</title>
+	</head>
+
+	<body>
+		<h1>Witaj na stronie głównej</h1>
+
+		<h2>Wiadomości na żywo: </h2>
+		<div id="messages"></div>
+
+		<button id="clear-button" onclick="ClearMessages()">Wyczyść</button>
+
+		<script src="/socket.io/socket.io.js"></script>
+    	<script>
+        	const Socket = io();
+
+			const Messages = document.getElementById("messages");
+
+			function ClearMessages() {
+				Messages.innerHTML = "";
+			}
+
+			Socket.on("broadcastMessage", (Data) => {
+				const Node = document.createElement("p");
+				const TextNode = document.createTextNode(Data.Message);
+
+				Node.append(TextNode);
+				Messages.append(Node);
+			});
+    	</script>
+	</body>
+</html>
