@@ -1,8 +1,8 @@
 import Express from "express";
-import {createServer} from "http";
-import {Server} from "socket.io";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import Path from "path";
-import {fileURLToPath} from "url";
+import { fileURLToPath } from "url";
 
 const App = Express();
 const Http = createServer(App);
@@ -13,275 +13,372 @@ const __dirname = Path.dirname(__filename);
 
 App.use(Express.static(__dirname));
 
-const Rooms = [];
+// Rooms.set(RoomName, { HostID: string, Password: string || null, MaxPlayers: number });
 
-// -- //
+const Rooms = new Map();
 
-function GetRoomID(RoomName) {
-  	return RoomName.replace(/\s+/g, "-").toLowerCase();
+// (:) //
+
+function ValidatePlayerName(PlayerName) {
+    const MaxLength = 24;
+
+    if (!PlayerName || !PlayerName.trim()) {
+        return {
+            PlayerName: null,
+            Message: "Nazwa gracza nie może być pusta!",
+        };
+    }
+
+    const TrimmedPlayerName = PlayerName.trim();
+
+    if (/\s/.test(TrimmedPlayerName)) {
+        return {
+            PlayerName: null,
+            Message: "Nazwa gracza zawiera nieprawidłowe znaki lub spacje!",
+        };
+    }
+
+    if (TrimmedPlayerName.length > MaxLength) {
+        return {
+            PlayerName: null,
+            Message: `Nazwa gracza jest za długa! Maksymalnie ${MaxLength} znaki.`,
+        };
+    }
+
+    return {
+        PlayerName: TrimmedPlayerName,
+        Message: "Sukces!"
+    };
 }
 
-function FindRoomByName(RoomName) {
-  	if (!RoomName) return null;
-  	return Rooms.find(Room => Room.Name.toLowerCase() === RoomName.trim().toLowerCase()) || null;
+function ValidateRoomName(RoomName) {
+    const MaxLength = 64;
+
+    if (!RoomName || !RoomName.trim()) {
+        return {
+            RoomName: null,
+            Message: "Nazwa pokoju nie może być pusta!",
+        };
+    }
+
+    const TrimmedRoomName = RoomName.trim();
+
+    if (/[^\S ]/.test(TrimmedRoomName)) {
+        return {
+            RoomName: null,
+            Message: "Nazwa pokoju zawiera nieprawidłowe znaki!",
+        };
+    }
+
+    if (TrimmedRoomName.length > MaxLength) {
+        return {
+            RoomName: null,
+            Message: `Nazwa pokoju jest za długa! Maksymalnie ${MaxLength} znaków.`,
+        };
+    }
+
+    if (Rooms.has(TrimmedRoomName)) {
+        return {
+            RoomName: null,
+            Message: "Pokój o takiej nazwie już istnieje!",
+        };
+    }
+
+    return {
+        RoomName: TrimmedRoomName,
+        Message: "Sukces!",
+    };
 }
 
-function IsPlayerInRoom(RoomObject, PlayerName) {
-  	if (!RoomObject || !RoomObject.Players || !PlayerName) return false;
-  	return RoomObject.Players.some(player => player.Name.toLowerCase() === PlayerName.trim().toLowerCase());
+function ValidateRoomPassword(Password) {
+    const MinLength = 6;
+    const MaxLength = 32;
+
+    if (!Password) {
+        return {
+            Password: null,
+            Message: "Sukces!",
+        };
+    }
+
+    const TrimmedPassword = Password.trim();
+
+    if (/[^\S ]/.test(TrimmedPassword)) {
+        return {
+            Password: null,
+            Message: "Hasło pokoju zawiera nieprawidłowe znaki!",
+        };
+    }
+
+    if (TrimmedPassword.length < MinLength || TrimmedPassword.length > MaxLength) {
+        return {
+            Password: null,
+            Message: `Hasło musi mieć od ${MinLength} do ${MaxLength} znaków!`,
+        };
+    }
+
+    return {
+        Password: TrimmedPassword,
+        Message: "Sukces!",
+    };
 }
 
-// -- //
+function ValidateRoomMaxPlayers(MaxPlayers) {
+    const MinLimit = 2;
+    const MaxLimit = 16;
+    const DefaultLimit = 8;
 
-function ValidatePlayerName(PlayerName, Socket) {
-  	const MaxLength = 24;
+    if (MaxPlayers === undefined || MaxPlayers === null || MaxPlayers === "") {
+        return {
+			MaxPlayers: DefaultLimit,
+			Message: "Sukces!"
+		};
+    }
 
-  	if (!PlayerName || !PlayerName.trim()) {
-    	return {
-      		PlayerName: Socket ? `Gość_${Socket.id.slice(0, 4)}` : null,
-      		Message: Socket ? null : "Nazwa gracza nie może być pusta!",
-    	};
-  	}
-  
-  	if (/\s/.test(PlayerName)) {
-    	return {
-      		PlayerName: null,
-      		Message: "Nazwa gracza zawiera nieprawidłowe znaki (spacje)!",
-    	};
-  	}
+    const ParsedLimit = parseInt(MaxPlayers, 10);
 
-  	if (PlayerName.length > MaxLength) {
-    	return {
-      		PlayerName: null,
-      		Message: `Nazwa gracza jest za długa! Maksymalnie ${MaxLength} znaki.`,
-    	};
-  	}
+    if (isNaN(ParsedLimit) || ParsedLimit < MinLimit || ParsedLimit > MaxLimit) {
+        return {
+            MaxPlayers: null,
+            Message: `Liczba graczy musi być liczbą od ${MinLimit} do ${MaxLimit}!`,
+        };
+    }
 
-  	return {
-		PlayerName: PlayerName.trim(),
-		Message: null
-	};
+    return {
+        MaxPlayers: ParsedLimit,
+        Message: "Sukces!",
+    };
 }
 
-function ValidateRoomName(RoomName, PlayerName) {
-  	const MaxLength = 64;
+// D:D //
 
-  	if (!RoomName || !RoomName.trim()) {
-    	return {
-      		RoomName: PlayerName ? `Pokój gracza ${PlayerName.trim()}` : null,
-      		Message: PlayerName ? null : "Nazwa pokoju nie może być pusta!",
-    	};
-  	}
+async function GetSocketsInRoom(RoomName) {
+  	const RoomData = Rooms.get(RoomName); 
+  	if (!RoomData) return [];
 
-  	if (/[^\S ]/.test(RoomName)) {
-    	return {
-      		RoomName: null,
-      		Message: "Nazwa pokoju zawiera nieprawidłowe znaki!",
-    	};
-  	}
+  	const HostID = RoomData.HostID;
+  	const Sockets = await IO.in(RoomName).fetchSockets();
 
-  	if (RoomName.length > MaxLength) {
-    	return {
-      		RoomName: null,
-      		Message: `Nazwa pokoju jest za długa! Maksymalnie ${MaxLength} znaków.`,
-    	};
-  	}
-
-  	const ExistingRoom = FindRoomByName(RoomName);
-  	if (ExistingRoom) {
-    	return {
-      		RoomName: null,
-      		Message: "Pokój o takiej nazwie już istnieje!",
-    	};
-  	}
-
-  	return {
-		RoomName: RoomName.trim(),
-		Message: null
-	};
+  	return Sockets.filter(socket => socket.id !== HostID);
 }
 
-// -- //
+// L:L //
 
-function CreateRoom(Socket, {RoomName, Password, PlayerName}, Callback) {
-  	const PlayerNameResult = ValidatePlayerName(PlayerName, Socket);
-  	if (!PlayerNameResult.PlayerName) {
-    	return Callback({ Status: "Error", Message: PlayerNameResult.Message });
-  	}
-  	const RealPlayerName = PlayerNameResult.PlayerName;
+async function UpdateRoom(RoomName) {
+	const RoomData = Rooms.get(RoomName);
+	if (!RoomData) return;
 
-  	const RoomNameResult = ValidateRoomName(RoomName, RealPlayerName);
-  	if (!RoomNameResult.RoomName) {
-    	return Callback({ Status: "Error", Message: RoomNameResult.Message });
-  	}
-  	const RealRoomName = RoomNameResult.RoomName;
+	const PlayerSockets = await GetSocketsInRoom(RoomName);
 
-  	const RealPassword = Password ? Password.replace(/[^\S ]/g, "") : "";
-  	const RoomID = GetRoomID(RealRoomName);
-
-  	const NewRoom = {
-		ID: RoomID,
-		Name: RealRoomName,
-		Password: RealPassword,
-		Players: [{
-			ID: Socket.id,
-			Name: RealPlayerName,
-			IsHost: true,
-		}],
-  	};
-
-  	Rooms.push(NewRoom);
-
-	Socket.join(NewRoom.ID);
-	Socket.CurrentRoomID = NewRoom.ID;
-	Socket.PlayerName = RealPlayerName;
-
-	console.log(`Player ${RealPlayerName} created room ${NewRoom.Name}!`)
-
-	return Callback({
-		Status: "Success",
-		Message: "Pokój został utworzony!",
-		RoomId: NewRoom.ID,
-		PlayerName: RealPlayerName
-	});
-}
-
-function JoinRoom(Socket, {RoomName, Password, PlayerName}, Callback) {
-  	const TargetRoom = FindRoomByName(RoomName);
-  	if (!TargetRoom) {
-  		return Callback({
-			Status: "Error",
-			Message: "Nie znaleziono takiego pokoju!",
-		});
-  	}
-
-  	if (TargetRoom.Password && TargetRoom.Password !== Password) {
-  		return Callback({
-			Status: "Error",
-			Message: "Nieprawidłowe hasło do pokoju!",
-		});
-  	}
-
-  	const PlayerNameResult = ValidatePlayerName(PlayerName, null);
-  	if (!PlayerNameResult.PlayerName) {
-  		return Callback({
-			Status: "Error",
-			Message: PlayerNameResult.Message,
-		});
-  	}
-  	const RealPlayerName = PlayerNameResult.PlayerName;
-
-  	if (IsPlayerInRoom(TargetRoom, RealPlayerName)) {
-    	return Callback({
-			Status: "Error",
-			Message: "Ta nazwa gracza jest już zajęta w tym pokoju!",
-		});
-  	}
-
-  	TargetRoom.Players.push({
+	const FormattedPlayers = PlayerSockets.map(Socket => ({
 		ID: Socket.id,
-		Name: RealPlayerName,
-		IsHost: false,
-	});
+		PlayerName: Socket.PlayerName || "Anonymous",
+	}));
 
-  	Socket.join(TargetRoom.ID);
-  	Socket.CurrentRoomID = TargetRoom.ID;
-  	Socket.PlayerName = RealPlayerName;
-  	
-	Socket.to(TargetRoom.ID).emit("playerJoined", {
-		Name: RealPlayerName
-	});
-
-	console.log(`Player ${RealPlayerName} joined room ${TargetRoom.ID}!`)
-
-  	return Callback({
-    	Status: "Success",
-    	Message: "Dołączono do pokoju!",
-    	RoomId: TargetRoom.ID,
-    	PlayerName: RealPlayerName,
-  	});
-}
-
-function DestroyRoom(RoomObject, ReasonMessage) {
-	IO.to(RoomObject.ID).emit("roomDeleted", {
-		Message: ReasonMessage
-	});
-	
-	IO.in(RoomObject.ID).socketsLeave(RoomObject.ID);
-
-	const RoomIndex = Rooms.findIndex(Room => Room.ID === RoomObject.ID);
-	if (RoomIndex !== -1) {
-		Rooms.splice(RoomIndex, 1);
-	}
-
-	console.log(`Room destroyed: ${RoomObject.Name}, ${ReasonMessage}!`);
-}
-
-// -- //
-
-function HostDestroyRoom(Socket, {RoomName}, Callback) {
-	const TargetRoom = FindRoomByName(RoomName);
-	if (!TargetRoom) {
-		return Callback({
-			Status: "Error",
-			Message: "Nie znaleziono takiego pokoju!",
-		});
-	}
-
-	const Requester = TargetRoom.Players.find(p => p.ID === Socket.id);
-	if (!Requester || !Requester.IsHost) {
-		return Callback({Status: "Error",
-			Message: "Tylko gospodarz może usunąć ten pokój!",
-		});
-	}
-
-	DestroyRoom(TargetRoom, "Gospodarz zamknął pokój.");
-
-	return Callback({
-		Status: "Success",
-		Message: "Pokój został pomyślnie usunięty!",
+	IO.to(RoomData.HostID).emit("roomUpdate", {
+		PlayerSockets: FormattedPlayers,
+        MaxPlayers: RoomData.MaxPlayers,
 	});
 }
 
-function HandlePlayerDisconnect(Socket) {
-    if (!Socket.CurrentRoomID) return;
+function CreateRoom(Socket, {RoomName, Password, MaxPlayers}, Callback) {
+    const RoomNameResult = ValidateRoomName(RoomName);
+    if (!RoomNameResult.RoomName) {
+        return Callback({
+            Success: false,
+            Message: RoomNameResult.Message,
+        });
+    }
 
-    const TargetRoom = Rooms.find(Room => Room.ID === Socket.CurrentRoomID);
-    if (!TargetRoom) return;
+    const RoomPasswordResult = ValidateRoomPassword(Password);
+    if (Password && !RoomPasswordResult.Password) {
+        return Callback({
+            Success: false,
+            Message: RoomPasswordResult.Message,
+        });
+    }
 
-    const Player = TargetRoom.Players.find(p => p.ID === Socket.id);
-    if (!Player) return;
+    const MaxPlayersResult = ValidateRoomMaxPlayers(MaxPlayers);
+    if (!MaxPlayersResult.MaxPlayers) {
+        return Callback({
+            Success: false,
+            Message: MaxPlayersResult.Message,
+        });
+    }
 
-    if (Player.IsHost) {
-        DestroyRoom(TargetRoom, "Gospodarz rozłączył się. Pokój został usunięty.");
+    const RealRoomName = RoomNameResult.RoomName;
+    const RealPassword = RoomPasswordResult.Password;
+    const RealMaxPlayers = MaxPlayersResult.MaxPlayers;
+
+    Socket.join(RealRoomName);
+    Socket.CurrentRoom = RealRoomName;
+
+    Rooms.set(RealRoomName, {
+        HostID: Socket.id,
+        Password: RealPassword,
+        MaxPlayers: RealMaxPlayers,
+    });
+
+    console.log(`Room created: ${RealRoomName}, ${RealMaxPlayers}, ${Socket.id}.`);
+
+    Callback({
+        Success: true,
+    });
+}
+
+async function CloseRoom(RoomName) {
+    if (!Rooms.has(RoomName)) return;
+
+    IO.to(RoomName).emit("roomClosed");
+    
+    const SocketsInRoom = await GetSocketsInRoom(RoomName);
+
+    Rooms.delete(RoomName);
+
+	for (const TargetSocket of SocketsInRoom) {
+		await LeaveRoom(TargetSocket);
+	}
+
+    console.log(`Room closed: ${RoomName}.`);
+}
+
+async function JoinRoom(Socket, {RoomName, PlayerName, Password}, Callback) {
+    const RoomData = Rooms.get(RoomName);
+    if (!RoomData) {
+        return Callback({
+            Success: false,
+            Message: "Taki pokój nie istnieje!",
+        });
+    }
+
+    const CurrentPlayers = await GetSocketsInRoom(RoomName);
+    if (CurrentPlayers.length >= RoomData.MaxPlayers) {
+        return Callback({
+            Success: false,
+            Message: "Pokój jest już pełen!",
+        });
+    }
+
+    const PlayerNameResult = ValidatePlayerName(PlayerName);
+    if (!PlayerNameResult.PlayerName) {
+        return Callback({
+            Success: false,
+            Message: PlayerNameResult.Message,
+        });
+    }
+
+    const SentPassword = Password ? Password.trim() : null;
+    if (RoomData.Password && RoomData.Password !== SentPassword) {
+        return Callback({
+            Success: false,
+            Message: "Nieprawidłowe hasło!",
+        });
+    }
+
+    const RealPlayerName = PlayerNameResult.PlayerName;
+
+    Socket.PlayerName = RealPlayerName;
+    Socket.CurrentRoom = RoomName;
+    Socket.join(RoomName);
+
+    console.log(`Player joined: ${RoomName}, ${RealPlayerName}, ${Socket.id}.`);
+
+    await UpdateRoom(RoomName);
+
+    Callback({
+        Success: true,
+    });
+}
+
+async function LeaveRoom(Socket, Callback) {
+    const RoomName = Socket.CurrentRoom;
+    if (!RoomName) return false;
+
+	const RoomData = Rooms.get(RoomName);
+	if (RoomData && RoomData.HostID === Socket.id) {
+		await CloseRoom(RoomName);
+
+		if (Callback) Callback({
+			Success: true,
+		})
+
+		return true;
+	}
+
+    Socket.leave(RoomName);
+    Socket.CurrentRoom = null;
+
+    console.log(`Player left: ${RoomName}, ${Socket.PlayerName || "Anonymous"}, ${Socket.id}.`);
+
+    if (Rooms.has(RoomName)) {
+        await UpdateRoom(RoomName);
+    }
+
+    if (Callback) Callback({
+        Success: true,
+    });
+
+    return true;
+}
+
+async function KickFromRoom(Socket, {TargetSocketID}, Callback) {
+    const RoomName = Socket.CurrentRoom;
+    if (!RoomName) return Callback({ Success: false });
+
+    const RoomData = Rooms.get(RoomName);
+    if (!RoomData || Socket.id !== RoomData.HostID) {
+        return Callback({ Success: false });
+    }
+
+    const TargetSocket = IO.sockets.sockets.get(TargetSocketID);
+    if (!TargetSocket || TargetSocket.CurrentRoom !== RoomName) {
+        return Callback({ Success: false });
+    }
+
+    await LeaveRoom(TargetSocket);
+
+    console.log(`Player kicked: ${RoomName}, ${TargetSocket.PlayerName}, ${TargetSocketID}.`);
+
+    TargetSocket.emit("kicked", {
+        Message: "Zostałeś wyrzucony z pokoju przez hosta.",
+    });
+
+    Callback({
+        Success: true,
+    });
+}
+
+// ?:? //
+
+async function HandleDisconnect(Socket) {
+    const RoomName = Socket.CurrentRoom;
+    if (!RoomName) return;
+
+    const RoomData = Rooms.get(RoomName);
+    if (!RoomData) return;
+
+    if (RoomData.HostID === Socket.id) {
+        await CloseRoom(RoomName);
     } else {
-        TargetRoom.Players = TargetRoom.Players.filter(p => p.ID !== Socket.id);
-        console.log(`Player ${Player.Name} left room ${TargetRoom.Name}!`);
-        Socket.to(TargetRoom.ID).emit("playerLeft", {Name: Player.Name});
+        await LeaveRoom(Socket);
     }
 }
 
-// -- //
+// 3:3 //
 
 IO.on("connection", (Socket) => {
-    console.log(`Device connected: ${Socket.id}!`);
+    console.log(`Device connected: ${Socket.id}.`);
 
-	Socket.on("createRoom", (Data, Callback) => {
-		CreateRoom(Socket, Data, Callback);
-	});
+    Socket.on("createRoom", (Data, Callback) => CreateRoom(Socket, Data, Callback));
+    Socket.on("joinRoom", (Data, Callback) => JoinRoom(Socket, Data, Callback));
+    Socket.on("leaveRoom", (Callback) => LeaveRoom(Socket, Callback));
+    Socket.on("kickPlayer", (Data, Callback) => KickFromRoom(Socket, Data, Callback));
 
-	Socket.on("joinRoom", (Data, Callback) => {
-		JoinRoom(Socket, Data, Callback);
-	});
+    Socket.on("disconnect", async (Reason) => {
+        console.log(`Device disconnected: ${Socket.id}, ${Reason}.`);
 
-	Socket.on("deleteRoom", (Data, Callback) => {
-		HostDestroyRoom(Socket, Data, Callback);
-	});
-
-	Socket.on("disconnect", (Reason) => {
-        console.log(`Device disconnected: ${Socket.id}, ${Reason}!`);
-		HandlePlayerDisconnect(Socket);
-	});
+		await HandleDisconnect(Socket);
+    });
 });
 
 const Port = 3000;

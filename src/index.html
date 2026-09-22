@@ -1,18 +1,178 @@
 <!DOCTYPE html>
-<html lang="pl-PL">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<link rel="stylesheet" href="style.css">
-		<title>Gra</title>
-	</head>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Socket.io Room Test</title>
+    <!-- Include Socket.io Client library supplied automatically by the server -->
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
 
-	<body>
-		<div>Test</div>
+    <h1>Socket.io Room Tester</h1>
+    <p>Your Socket ID: <span id="my-socket-id">Connecting...</span></p>
 
-		<script src="/socket.io/socket.io.js"></script>
-    	<script>
-        	const Socket = io();
-    	</script>
-	</body>
+    <hr>
+
+    <!-- SECTION 1: CREATE ROOM -->
+    <div id="create-section">
+        <h3>Stwórz Pokój (Host)</h3>
+        <input type="text" id="create-room-name" placeholder="Nazwa pokoju"><br><br>
+        <input type="text" id="create-password" placeholder="Hasło (opcjonalnie)"><br><br>
+        <input type="number" id="create-max-players" placeholder="Max graczy (np. 8)"><br><br>
+        <button id="btn-create">Utwórz pokój</button>
+    </div>
+
+    <!-- SECTION 2: JOIN ROOM -->
+    <div id="join-section">
+        <h3>Dołącz do Pokoju (Gracz)</h3>
+        <input type="text" id="join-room-name" placeholder="Nazwa pokoju"><br><br>
+        <input type="text" id="join-player-name" placeholder="Twoja nazwa gracza"><br><br>
+        <input type="text" id="join-password" placeholder="Hasło pokoju"><br><br>
+        <button id="btn-join">Dołącz do pokoju</button>
+    </div>
+
+    <!-- SECTION 3: CONNECTED SCREEN / GAME ACTIVE ROOM -->
+    <div id="room-screen" style="display: none;">
+        <h2 id="room-title">Jesteś w pokoju: </h2>
+        <p id="room-role"></p>
+        
+        <div id="host-controls" style="display: none;">
+            <h3>Zarządzanie Graczami (Widok Hosta):</h3>
+            <ul id="player-list"></ul>
+        </div>
+
+        <div id="player-controls" style="display: none;">
+            <p>Oczekiwanie na rozpoczęcie gry przez Hosta...</p>
+        </div>
+
+        <br>
+        <button id="btn-leave">Opuść/zamknij pokój</button>
+    </div>
+
+    <script>
+        const Socket = io();
+
+        // DOM elements
+        const MySocketIdText = document.getElementById('my-socket-id');
+        const CreateSection = document.getElementById('create-section');
+        const JoinSection = document.getElementById('join-section');
+        const RoomScreen = document.getElementById('room-screen');
+        const RoomTitle = document.getElementById('room-title');
+        const RoomRole = document.getElementById('room-role');
+        const HostControls = document.getElementById('host-controls');
+        const PlayerControls = document.getElementById('player-controls');
+        const PlayerList = document.getElementById('player-list');
+
+        let CurrentRoomName = "";
+
+        // Display connected connection identity details
+        Socket.on('connect', () => {
+            MySocketIdText.textContent = Socket.id;
+        });
+
+        // 1. ACTION: Create Room
+        document.getElementById('btn-create').addEventListener('click', () => {
+            const RoomName = document.getElementById('create-room-name').value;
+            const Password = document.getElementById('create-password').value;
+            const MaxPlayers = document.getElementById('create-max-players').value;
+
+            // Notice the PascalCase keys in the payload object structure
+            Socket.emit('createRoom', { RoomName, Password, MaxPlayers }, (Response) => {
+                if (Response.Success) {
+                    CurrentRoomName = RoomName;
+                    ShowRoomScreen("Host", RoomName);
+                } else {
+                    alert("Błąd: " + Response.Message);
+                }
+            });
+        });
+
+        // 2. ACTION: Join Room
+        document.getElementById('btn-join').addEventListener('click', () => {
+            const RoomName = document.getElementById('join-room-name').value;
+            const PlayerName = document.getElementById('join-player-name').value;
+            const Password = document.getElementById('join-password').value;
+
+            Socket.emit('joinRoom', { RoomName, PlayerName, Password }, (Response) => {
+                if (Response.Success) {
+                    CurrentRoomName = RoomName;
+                    ShowRoomScreen("Gracz", RoomName);
+                } else {
+                    alert("Błąd: " + Response.Message);
+                }
+            });
+        });
+
+        // 3. ACTION: Leave Room Manually
+        document.getElementById('btn-leave').addEventListener('click', () => {
+            Socket.emit('leaveRoom', (Response) => {
+                ResetUI();
+            });
+        });
+
+        // EVENT: Incoming real-time list updates targeted at Host
+        Socket.on('roomUpdate', (Data) => {
+            PlayerList.innerHTML = "";
+            
+            if (Data.PlayerSockets.length === 0) {
+                PlayerList.innerHTML = "<li>Brak graczy w pokoju.</li>";
+                return;
+            }
+
+            Data.PlayerSockets.forEach(Player => {
+                const Li = document.createElement('li');
+                Li.textContent = `${Player.PlayerName} (ID: ${Player.ID}) `;
+                
+                // Kick action button appended to layout for host administration
+                const KickBtn = document.createElement('button');
+                KickBtn.textContent = "Wyrzuć";
+                KickBtn.onclick = () => {
+                    Socket.emit('kickPlayer', { TargetSocketID: Player.ID }, (Res) => {
+                        if (!Res.Success) alert("Nie udało się wyrzucić gracza.");
+                    });
+                };
+                
+                Li.appendChild(KickBtn);
+                PlayerList.appendChild(Li);
+            });
+        });
+
+        // EVENT: Listener fired when Room gets terminated by its creator
+        Socket.on('roomClosed', () => {
+            alert("Pokój został zamknięty przez hosta!");
+            ResetUI();
+        });
+
+        // EVENT: Listener fired when a guest player is forcefully kicked
+        Socket.on('kicked', (Data) => {
+            alert(Data.Message);
+            ResetUI();
+        });
+
+        // Helper UI Management Functions
+        function ShowRoomScreen(Role, RoomName) {
+            CreateSection.style.display = "none";
+            JoinSection.style.display = "none";
+            RoomScreen.style.display = "block";
+            RoomTitle.textContent = "Jesteś w pokoju: " + RoomName;
+            RoomRole.textContent = "Twoja rola: " + Role;
+
+            if (Role === "Host") {
+                HostControls.style.display = "block";
+                PlayerControls.style.display = "none";
+            } else {
+                HostControls.style.display = "none";
+                PlayerControls.style.display = "block";
+            }
+        }
+
+        function ResetUI() {
+            CreateSection.style.display = "block";
+            JoinSection.style.display = "block";
+            RoomScreen.style.display = "none";
+            PlayerList.innerHTML = "";
+            CurrentRoomName = "";
+        }
+    </script>
+</body>
 </html>
