@@ -11,7 +11,7 @@
 1. utwórz nowe okienko wiersza poleceń i wpisz "ipconfig"
 2. doomscrolluj aż znajdziesz segment o nazwie "Wireless LAN adapter Wi-Fi 2" lub podobny (lub ethernet gdy ruter jest bezpośrednio połączony do pc)
 3. na telofonie połącz się z tym samym wifi co jest pc połączony
-4. otwórz przeglądarkę i w pasek adresu spisz "[http://ip:3000](localhost:3000)" gdzie ip jest IPv4 Address z segmentu z drugiego (2) punktu
+4. otwórz przeglądarkę i w pasek adresu spisz " [http://ip:3000](localhost:3000) " gdzie ip jest IPv4 Address z segmentu z drugiego (2) punktu
 5. jeżeli jest tak samo jak po otworzeniu localhosta na pc to całuski
 67. jeżeli strona się długo ładuje lub wyświetla dziwny błąd gdy wpisałeś poprawny adres to pomyśl o zmania na hotspota, może to być wina ustawień rutera
 
