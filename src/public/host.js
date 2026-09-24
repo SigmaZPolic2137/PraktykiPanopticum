@@ -43,13 +43,22 @@ async function ShowJoinAddresses() {
 
     try {
         const Response = await fetch("/api/addresses");
-        const { Addresses, Port } = await Response.json();
-        for (const Address of Addresses) Urls.push(`http://${Address}:${Port}`);
+        const { Addresses } = await Response.json();
+        
+        for (const Address of Addresses) {
+            // Dodajemy adres tylko, jeśli nie zawiera localhost ani pętli zwrotnej 127.0.0.1.
+            if (!Address.includes("localhost") && !Address.includes("127.0.0.1")) {
+                Urls.push(Address);
+            }
+        }
     } catch {
         // Zostaje adres z paska przeglądarki.
     }
 
-    if (!["localhost", "127.0.0.1"].includes(location.hostname)) Urls.unshift(location.origin);
+    // Dodajemy adres z paska przeglądarki klienta TYLKO wtedy, gdy nie jest to localhost/127.0.0.1.
+    if (!["localhost", "127.0.0.1"].includes(location.hostname)) {
+        Urls.unshift(location.origin);
+    }
 
     Container.innerHTML = "";
     for (const Url of [...new Set(Urls)]) {
@@ -60,7 +69,7 @@ async function ShowJoinAddresses() {
     }
 
     if (Urls.length === 0) {
-        Container.textContent = "Nie udało się ustalić adresu IP komputera – sprawdź go poleceniem `ip addr`.";
+        Container.textContent = "Nie udało się ustalić adresu IP komputera – sprawdź go poleceniem `ip addr` lub `ipconfig`.";
     }
 }
 

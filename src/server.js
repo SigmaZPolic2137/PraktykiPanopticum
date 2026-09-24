@@ -14,17 +14,35 @@ const __dirname = Path.dirname(__filename);
 
 App.use(Express.static(Path.join(__dirname, "public")));
 
-// Adresy, pod którymi telefony mogą znaleźć serwer w sieci lokalnej.
-// W kontenerze interfejsy sieciowe mogą być inne niż na hoście, więc dev.sh podaje je w HOST_IPS.
+// Adresy, pod którymi klient (np. telefon lub przeglądarka) może znaleźć serwer.
+// Najpierw sprawdzamy, czy zapytanie przyszło przez zewnętrzną domenę/tunel.
 App.get("/api/addresses", (Request, Response) => {
-    const Addresses = process.env.HOST_IPS
+    const incomingHost = Request.headers['x-forwarded-host'] || Request.headers.host;
+
+    if (incomingHost && /[a-zA-Z]/.test(incomingHost) && !incomingHost.includes("localhost")) {
+        const protocol = Request.secure || Request.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        return Response.json({ 
+            Addresses: [`${protocol}://${incomingHost}`], 
+            IsDomain: true 
+        });
+    }
+
+    // Lokalna sieć/LAN: Adresy, pod którymi telefony mogą znaleźć serwer w sieci lokalnej.
+    // W kontenerze interfejsy sieciowe mogą być inne niż na hoście, więc dev.sh podaje je w HOST_IPS.
+    const rawAddresses = process.env.HOST_IPS
         ? process.env.HOST_IPS.split(/\s+/).filter(Boolean)
         : Object.values(OS.networkInterfaces())
             .flat()
-            .filter(Interface => Interface.family === "IPv4" && !Interface.internal)
+            .filter(Interface => Interface?.family === "IPv4" && !Interface?.internal)
             .map(Interface => Interface.address);
 
-    Response.json({ Addresses, Port });
+    const validAddresses = rawAddresses.filter(ip => ip !== "127.0.0.1" && ip !== "localhost");
+    const Addresses = validAddresses.map(ip => `http://${ip}:${Port}`);
+
+    Response.json({ 
+        Addresses, 
+        IsDomain: false 
+    });
 });
 
 // Rooms.set(RoomName, { HostID: string, Password: string || null, MaxPlayers: number, InGame: boolean });
