@@ -4,7 +4,6 @@ import { Server } from "socket.io";
 import Path from "path";
 import { fileURLToPath } from "url";
 import OS from "os";
-import { Game } from "./game.js";
 
 const App = Express();
 const Http = createServer(App);
@@ -28,7 +27,8 @@ App.get("/api/addresses", (Request, Response) => {
     Response.json({ Addresses, Port });
 });
 
-// Rooms.set(RoomName, { HostID: string, Password: string || null, MaxPlayers: number, Game: Game || null, Timer: Interval || null });
+// Rooms.set(RoomName, { HostID: string, Password: string || null, MaxPlayers: number, InGame: boolean });
+// Gra jest symulowana w przeglądarce hosta, serwer tylko przekazuje wiadomości między hostem a telefonami.
 
 const Rooms = new Map();
 
@@ -139,7 +139,7 @@ function ValidateRoomPassword(Password) {
 }
 
 function ValidateRoomMaxPlayers(MaxPlayers) {
-    const MinLimit = 2;
+    const MinLimit = 1;
     const MaxLimit = 16;
     const DefaultLimit = 8;
 
@@ -239,8 +239,7 @@ function CreateRoom(Socket, {RoomName, Password, MaxPlayers}, Callback) {
         HostID: Socket.id,
         Password: RealPassword,
         MaxPlayers: RealMaxPlayers,
-        Game: null,
-        Timer: null,
+        InGame: false,
     });
 
     console.log(`Room created: ${RealRoomName}, ${RealMaxPlayers}, ${Socket.id}.`);
@@ -253,8 +252,6 @@ function CreateRoom(Socket, {RoomName, Password, MaxPlayers}, Callback) {
 async function CloseRoom(RoomName) {
     const RoomData = Rooms.get(RoomName);
     if (!RoomData) return;
-
-    StopGame(RoomData);
 
     IO.to(RoomName).emit("roomClosed");
     
@@ -291,7 +288,7 @@ async function JoinRoom(Socket, {RoomName, PlayerName, Password}, Callback) {
         });
     }
 
-    if (RoomData.Game) {
+    if (RoomData.InGame) {
         return Callback({
             Success: false,
             Message: "Gra w tym pokoju już trwa!",
@@ -355,8 +352,8 @@ async function LeaveRoom(Socket, Callback) {
     Socket.leave(RoomName);
     Socket.CurrentRoom = null;
 
-    if (RoomData && RoomData.Game) {
-        RoomData.Game.RemovePlayer(Socket.id);
+    if (RoomData && RoomData.InGame) {
+        IO.to(RoomData.HostID).emit("playerLeft", { ID: Socket.id });
     }
 
     console.log(`Player left: ${RoomName}, ${Socket.PlayerName || "Anonymous"}, ${Socket.id}.`);
@@ -401,26 +398,24 @@ async function KickFromRoom(Socket, {TargetSocketID}, Callback) {
 
 // >:> //
 
-const TickRate = 60;
-const SnapshotEvery = 2;
+function GetHostRoom(Socket) {
+    const RoomData = Rooms.get(Socket.CurrentRoom);
+    if (!RoomData || RoomData.HostID !== Socket.id) return null;
 
-function StopGame(RoomData) {
-    if (RoomData.Timer) clearInterval(RoomData.Timer);
-    RoomData.Timer = null;
-    RoomData.Game = null;
+    return RoomData;
 }
 
 async function StartGame(Socket, Callback) {
     const RoomName = Socket.CurrentRoom;
-    const RoomData = Rooms.get(RoomName);
-    if (!RoomData || RoomData.HostID !== Socket.id) {
+    const RoomData = GetHostRoom(Socket);
+    if (!RoomData) {
         return Callback({
             Success: false,
             Message: "Tylko host może rozpocząć grę!",
         });
     }
 
-    if (RoomData.Game) {
+    if (RoomData.InGame) {
         return Callback({
             Success: false,
             Message: "Gra już trwa!",
@@ -435,80 +430,54 @@ async function StartGame(Socket, Callback) {
         });
     }
 
-    const CurrentGame = new Game(PlayerSockets.map(PlayerSocket => ({
-        ID: PlayerSocket.id,
-        PlayerName: PlayerSocket.PlayerName || "Anonymous",
-    })));
-
-    RoomData.Game = CurrentGame;
-
-    for (const Player of CurrentGame.Players.values()) {
-        IO.to(Player.ID).emit("playerStatus", {
-            State: "countdown",
-            Color: Player.Color,
-        });
-    }
-
-    let Tick = 0;
-    let LastTime = performance.now();
-
-    RoomData.Timer = setInterval(() => {
-        const Now = performance.now();
-        const Dt = Math.min(0.05, (Now - LastTime) / 1000);
-        LastTime = Now;
-
-        for (const Event of CurrentGame.Update(Dt)) {
-            if (Event.Type === "go") {
-                for (const Player of CurrentGame.Players.values()) {
-                    IO.to(Player.ID).emit("playerStatus", { State: "playing", Color: Player.Color });
-                }
-            } else if (Event.Type === "hit") {
-                IO.to(Event.ID).emit("hit");
-            } else if (Event.Type === "eliminated") {
-                IO.to(Event.ID).emit("playerStatus", {
-                    State: "eliminated",
-                    Score: Event.Score,
-                    Place: Event.Place,
-                    Total: CurrentGame.Players.size,
-                });
-            }
-        }
-
-        if (CurrentGame.Over) {
-            FinishGame(RoomName, RoomData, CurrentGame);
-            return;
-        }
-
-        if (++Tick % SnapshotEvery === 0) {
-            IO.to(RoomData.HostID).volatile.emit("gameState", CurrentGame.Snapshot());
-        }
-    }, 1000 / TickRate);
+    RoomData.InGame = true;
 
     console.log(`Game started: ${RoomName}, ${PlayerSockets.length} players.`);
 
     Callback({
         Success: true,
+        Players: PlayerSockets.map(PlayerSocket => ({
+            ID: PlayerSocket.id,
+            PlayerName: PlayerSocket.PlayerName || "Anonymous",
+        })),
     });
 }
 
-function FinishGame(RoomName, RoomData, FinishedGame) {
-    StopGame(RoomData);
+// Host wysyła zdarzenia z gry do konkretnego gracza (odliczanie, trafienie, eliminacja).
+const PlayerEvents = new Set(["playerStatus", "hit"]);
 
-    const Results = FinishedGame.Results();
+function SendToPlayer(Socket, { ID, Event, Payload }) {
+    const RoomData = GetHostRoom(Socket);
+    if (!RoomData || !RoomData.InGame || !PlayerEvents.has(Event)) return;
 
-    IO.to(RoomData.HostID).emit("gameState", FinishedGame.Snapshot());
-    IO.to(RoomName).emit("gameOver", { Results });
+    const TargetSocket = IO.sockets.sockets.get(ID);
+    if (!TargetSocket || TargetSocket.CurrentRoom !== Socket.CurrentRoom || TargetSocket.id === Socket.id) return;
+
+    TargetSocket.emit(Event, Payload && typeof Payload === "object" ? Payload : {});
+}
+
+function FinishGame(Socket, { Results }) {
+    const RoomName = Socket.CurrentRoom;
+    const RoomData = GetHostRoom(Socket);
+    if (!RoomData || !RoomData.InGame) return;
+
+    RoomData.InGame = false;
+
+    Socket.to(RoomName).emit("gameOver", {
+        Results: Array.isArray(Results) ? Results.slice(0, RoomData.MaxPlayers) : [],
+    });
 
     console.log(`Game finished: ${RoomName}.`);
 
     UpdateRoom(RoomName);
 }
 
+// Stan przycisku z telefonu trafia prosto do hosta, który symuluje grę.
 function SetInput(Socket, Data) {
     const RoomData = Rooms.get(Socket.CurrentRoom);
-    if (!RoomData || !RoomData.Game) return;
+    if (!RoomData || !RoomData.InGame || RoomData.HostID === Socket.id) return;
 
-    RoomData.Game.SetHolding(Socket.id, Boolean(Data && Data.Holding));
+    IO.to(RoomData.HostID).emit("input", { ID: Socket.id, Holding: Boolean(Data && Data.Holding) });
 }
 
 async function ListRooms(Callback) {
@@ -522,7 +491,7 @@ async function ListRooms(Callback) {
             Players: PlayerSockets.length,
             MaxPlayers: RoomData.MaxPlayers,
             HasPassword: Boolean(RoomData.Password),
-            InGame: Boolean(RoomData.Game),
+            InGame: RoomData.InGame,
         });
     }
 
@@ -561,6 +530,8 @@ IO.on("connection", (Socket) => {
     Socket.on("listRooms", (Callback) => ListRooms(SafeCallback(Callback)));
     Socket.on("startGame", (Callback) => StartGame(Socket, SafeCallback(Callback)));
     Socket.on("input", (Data) => SetInput(Socket, Data));
+    Socket.on("toPlayer", (Data) => SendToPlayer(Socket, SafeData(Data)));
+    Socket.on("finishGame", (Data) => FinishGame(Socket, SafeData(Data)));
 
     Socket.on("disconnect", async (Reason) => {
         console.log(`Device disconnected: ${Socket.id}, ${Reason}.`);

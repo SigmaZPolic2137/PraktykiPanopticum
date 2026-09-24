@@ -1,9 +1,9 @@
+import { Game, World, PlayerSize, Difficulties } from "./game.js";
+
 const Socket = io();
 
-// Dynamically calculated based on viewport dimensions to remove empty space padding
-const World = { Width: 1600, Height: 900, GroundY: 800 };
-const PlayerSize = 44;
-const RenderDelay = 0.1;
+// Maksymalny krok symulacji, żeby przy niskim FPS gracz nie przeskakiwał przez kolce.
+const MaxStep = 1 / 120;
 
 const Canvas = document.getElementById("game-canvas");
 const Ctx = Canvas.getContext("2d");
@@ -13,14 +13,20 @@ const LobbyScreen = document.getElementById("lobby-screen");
 const ResultsScreen = document.getElementById("results-screen");
 const PlayerList = document.getElementById("player-list");
 const StartButton = document.getElementById("btn-start");
+const DifficultySelect = document.getElementById("difficulty");
 
 let CurrentRoomName = "";
-let Snapshots = [];
 let SmoothPlayerAngles = new Map();
-let ClockOffset = null;
-let GameVisible = false;
+let CurrentGame = null;
+let ViewWidth = 1600;
+let LastFrameTime = performance.now();
 
-document.getElementById("room-name").value = "Pokój " + Math.floor(100 + Math.random() * 900);
+document.getElementById("room-name").value = "Pokój " + Math.floor(1000 + Math.random() * 9000);
+
+for (const [Name, Settings] of Object.entries(Difficulties)) {
+    DifficultySelect.add(new Option(Settings.Label, Name));
+}
+DifficultySelect.value = "medium";
 
 // (:) //
 
@@ -93,10 +99,13 @@ function StartGame(ErrorElement) {
         }
 
         document.getElementById(ErrorElement).textContent = "";
-        Snapshots = [];
-        ClockOffset = null;
-        GameVisible = true;
+        CurrentGame = new Game(Response.Players, ViewWidth, DifficultySelect.value);
+        SmoothPlayerAngles.clear();
         ShowScreen(null);
+
+        for (const Player of CurrentGame.Players.values()) {
+            SendToPlayer(Player.ID, "playerStatus", { State: "countdown", Color: Player.Color });
+        }
     });
 }
 
@@ -104,7 +113,7 @@ if (StartButton) StartButton.addEventListener("click", () => StartGame("lobby-er
 document.getElementById("btn-again").addEventListener("click", () => StartGame("results-error"));
 
 document.getElementById("btn-lobby").addEventListener("click", () => {
-    GameVisible = false;
+    CurrentGame = null;
     ShowScreen(LobbyScreen);
 });
 
@@ -138,17 +147,55 @@ function RenderPlayerList(Players, MaxPlayers) {
 
 Socket.on("roomUpdate", (Data) => RenderPlayerList(Data.PlayerSockets, Data.MaxPlayers));
 
-Socket.on("gameState", (Snapshot) => {
-    const Now = performance.now() / 1000;
-    const Offset = Now - Snapshot.T;
-
-    if (ClockOffset === null || Offset < ClockOffset) ClockOffset = Offset;
-
-    Snapshots.push(Snapshot);
-    if (Snapshots.length > 60) Snapshots.shift();
+Socket.on("input", ({ ID, Holding }) => {
+    if (CurrentGame) CurrentGame.SetHolding(ID, Holding);
 });
 
-Socket.on("gameOver", ({ Results }) => {
+Socket.on("playerLeft", ({ ID }) => {
+    if (CurrentGame) CurrentGame.RemovePlayer(ID);
+});
+
+// D:D //  Symulacja
+
+function SendToPlayer(ID, Event, Payload) {
+    Socket.emit("toPlayer", { ID, Event, Payload });
+}
+
+function HandleGameEvent(Event) {
+    if (Event.Type === "go") {
+        for (const Player of CurrentGame.Players.values()) {
+            SendToPlayer(Player.ID, "playerStatus", { State: "playing", Color: Player.Color });
+        }
+    } else if (Event.Type === "hit") {
+        SendToPlayer(Event.ID, "hit", {});
+    } else if (Event.Type === "eliminated") {
+        SendToPlayer(Event.ID, "playerStatus", {
+            State: "eliminated",
+            Score: Event.Score,
+            Place: Event.Place,
+            Total: CurrentGame.Players.size,
+        });
+    }
+}
+
+function StepGame(Dt) {
+    if (!CurrentGame || CurrentGame.Over) return;
+
+    CurrentGame.SetWidth(ViewWidth);
+
+    const Steps = Math.ceil(Dt / MaxStep);
+    for (let I = 0; I < Steps && !CurrentGame.Over; I++) {
+        for (const Event of CurrentGame.Update(Dt / Steps)) HandleGameEvent(Event);
+    }
+
+    if (CurrentGame.Over) {
+        const Results = CurrentGame.Results();
+        Socket.emit("finishGame", { Results });
+        ShowResults(Results);
+    }
+}
+
+function ShowResults(Results) {
     const List = document.getElementById("results-list");
     if (!List) return;
     List.innerHTML = "";
@@ -173,18 +220,18 @@ Socket.on("gameOver", ({ Results }) => {
 
     document.getElementById("results-error").textContent = "";
     ShowScreen(ResultsScreen);
-});
+}
 
 Socket.on("disconnect", () => {
     if (!CurrentRoomName) return;
 
     CurrentRoomName = "";
-    GameVisible = false;
+    CurrentGame = null;
     ShowScreen(CreateScreen);
     document.getElementById("create-error").textContent = "Utracono połączenie z serwerem – pokój został zamknięty.";
 });
 
-// D:D //  Rysowanie
+// L:L //  Rysowanie
 
 function Hash(N) {
     const X = Math.sin(N * 127.1 + 311.7) * 43758.5453;
@@ -193,34 +240,6 @@ function Hash(N) {
 
 function Lerp(A, B, T) {
     return A + (B - A) * T;
-}
-
-function GetRenderState() {
-    if (Snapshots.length === 0) return null;
-
-    const Latest = Snapshots[Snapshots.length - 1];
-    const RenderT = performance.now() / 1000 - ClockOffset - RenderDelay;
-
-    let Index = Snapshots.length - 1;
-    while (Index > 0 && Snapshots[Index - 1].T > RenderT) Index--;
-
-    const B = Snapshots[Index];
-    const A = Snapshots[Index - 1];
-    if (RenderT >= Latest.T) return Latest;
-    if (!A) return B;
-
-    const T = Math.max(0, Math.min(1, (RenderT - A.T) / (B.T - A.T || 1)));
-    const PreviousPlayers = new Map(A.Players.map(Player => [Player.ID, Player]));
-
-    return {
-        ...B,
-        Distance: Lerp(A.Distance, B.Distance, T),
-        Players: B.Players.map(Player => {
-            const Previous = PreviousPlayers.get(Player.ID);
-            if (!Previous) return Player;
-            return { ...Player, X: Lerp(Previous.X, Player.X, T), Y: Lerp(Previous.Y, Player.Y, T) };
-        }),
-    };
 }
 
 function DrawCloud(X, Y, Scale) {
@@ -302,232 +321,223 @@ function DrawScenery(Distance, ViewLeft, ViewRight) {
 }
 
 function DrawSpikes(Spikes, Distance) {
-  Ctx.lineJoin = "miter";
+    Ctx.lineJoin = "miter";
 
-  for (const Spike of Spikes) {
-    const Left = Spike.X - Distance;
-    const Right = Left + Spike.W;
-    const CenterX = Left + Spike.W / 2;
-    const IsUp = Spike.Dir === "up";
-    const Dir = IsUp ? -1 : 1;
-    const BaseY = Spike.Y;
-    const TipY = BaseY + Spike.H * Dir;
+    for (const Spike of Spikes) {
+        const Left = Spike.X - Distance;
+        const Right = Left + Spike.W;
+        const CenterX = Left + Spike.W / 2;
+        const IsUp = Spike.Dir === "up";
+        const Dir = IsUp ? -1 : 1;
+        const BaseY = Spike.Y;
+        const TipY = BaseY + Spike.H * Dir;
 
-    // Outer outline
-    Ctx.beginPath();
-    Ctx.moveTo(Left, BaseY);
-    Ctx.lineTo(Right, BaseY);
-    Ctx.lineTo(CenterX, TipY);
-    Ctx.closePath();
-    Ctx.strokeStyle = "#0e1114";
-    Ctx.lineWidth = 6;
-    Ctx.stroke();
+        // Outer outline
+        Ctx.beginPath();
+        Ctx.moveTo(Left, BaseY);
+        Ctx.lineTo(Right, BaseY);
+        Ctx.lineTo(CenterX, TipY);
+        Ctx.closePath();
+        Ctx.strokeStyle = "#0e1114";
+        Ctx.lineWidth = 6;
+        Ctx.stroke();
 
-    // Left half shading (Light)
-    Ctx.beginPath();
-    Ctx.moveTo(Left, BaseY);
-    Ctx.lineTo(CenterX, BaseY);
-    Ctx.lineTo(CenterX, TipY);
-    Ctx.closePath();
-    Ctx.fillStyle = "#5c6470";
-    Ctx.fill();
+        // Left half shading (Light)
+        Ctx.beginPath();
+        Ctx.moveTo(Left, BaseY);
+        Ctx.lineTo(CenterX, BaseY);
+        Ctx.lineTo(CenterX, TipY);
+        Ctx.closePath();
+        Ctx.fillStyle = "#5c6470";
+        Ctx.fill();
 
-    // Right half shading (Dark)
-    Ctx.beginPath();
-    Ctx.moveTo(CenterX, BaseY);
-    Ctx.lineTo(Right, BaseY);
-    Ctx.lineTo(CenterX, TipY);
-    Ctx.closePath();
-    Ctx.fillStyle = "#343942";
-    Ctx.fill();
+        // Right half shading (Dark)
+        Ctx.beginPath();
+        Ctx.moveTo(CenterX, BaseY);
+        Ctx.lineTo(Right, BaseY);
+        Ctx.lineTo(CenterX, TipY);
+        Ctx.closePath();
+        Ctx.fillStyle = "#343942";
+        Ctx.fill();
 
-    // Center dividing line
-    Ctx.beginPath();
-    Ctx.moveTo(CenterX, BaseY);
-    Ctx.lineTo(CenterX, TipY);
-    Ctx.strokeStyle = "#808b9c";
-    Ctx.lineWidth = 2;
-    Ctx.stroke();
+        // Center dividing line
+        Ctx.beginPath();
+        Ctx.moveTo(CenterX, BaseY);
+        Ctx.lineTo(CenterX, TipY);
+        Ctx.strokeStyle = "#808b9c";
+        Ctx.lineWidth = 2;
+        Ctx.stroke();
 
-    // Spike base band
-    Ctx.fillStyle = "#1e2126";
-    const BaseHeight = 8 * Dir;
-    Ctx.fillRect(Left, BaseY, Spike.W, BaseHeight);
-    Ctx.strokeStyle = "#0e1114";
-    Ctx.lineWidth = 3;
-    Ctx.strokeRect(Left, BaseY, Spike.W, BaseHeight);
-  }
+        // Spike base band
+        Ctx.fillStyle = "#1e2126";
+        const BaseHeight = 8 * Dir;
+        Ctx.fillRect(Left, BaseY, Spike.W, BaseHeight);
+        Ctx.strokeStyle = "#0e1114";
+        Ctx.lineWidth = 3;
+        Ctx.strokeRect(Left, BaseY, Spike.W, BaseHeight);
+    }
 }
 
 function DrawPlayers(Players, Speed, Time) {
-  const Half = PlayerSize / 2;
-  const CurrentPlayerIDs = new Set(Players.map(P => P.ID));
+    const Half = PlayerSize / 2;
+    const CurrentPlayerIDs = new Set(Players.map(P => P.ID));
 
-  // Clean up disconnected players from rotation cache
-  for (const ID of SmoothPlayerAngles.keys()) {
-    if (!CurrentPlayerIDs.has(ID)) SmoothPlayerAngles.delete(ID);
-  }
-
-  for (const Player of Players) {
-    if (!Player.Alive) continue;
-
-    Ctx.save();
-    Ctx.translate(Player.X, Player.Y);
-
-    // Flashing effect if slowed
-    if (Player.Slowed) {
-      Ctx.globalAlpha = 0.45 + 0.4 * Math.abs(Math.sin(Time * 18));
+    // Clean up disconnected players from rotation cache
+    for (const ID of SmoothPlayerAngles.keys()) {
+        if (!CurrentPlayerIDs.has(ID)) SmoothPlayerAngles.delete(ID);
     }
 
-    Ctx.save();
-    
-    // Smooth angle rotation
-    const TargetAngle = Math.atan2(Player.VY, Speed) * 0.7;
-    let CurrentAngle = SmoothPlayerAngles.has(Player.ID) 
-      ? SmoothPlayerAngles.get(Player.ID) 
-      : TargetAngle;
-    
-    CurrentAngle = Lerp(CurrentAngle, TargetAngle, 0.15);
-    SmoothPlayerAngles.set(Player.ID, CurrentAngle);
-    
-    Ctx.rotate(CurrentAngle);
+    for (const Player of Players) {
+        if (!Player.Alive) continue;
 
-    // Draw cube body
-    Ctx.fillStyle = Player.Color;
-    Ctx.strokeStyle = "#111";
-    Ctx.lineWidth = 4;
-    Ctx.fillRect(-Half, -Half, PlayerSize, PlayerSize);
-    Ctx.strokeRect(-Half, -Half, PlayerSize, PlayerSize);
+        Ctx.save();
+        Ctx.translate(Player.X, Player.Y);
 
-    // Inner gloss layer
-    Ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-    Ctx.fillRect(-Half + 8, -Half + 8, PlayerSize - 16, PlayerSize - 16);
+        // Flashing effect if slowed
+        if (Player.SlowTimer > 0) {
+        Ctx.globalAlpha = 0.45 + 0.4 * Math.abs(Math.sin(Time * 18));
+        }
 
-    // Face / Eye detail
-    Ctx.fillStyle = "#111";
-    Ctx.fillRect(4, -8, 8, 8);
-    Ctx.restore();
+        Ctx.save();
+        
+        // Smooth angle rotation
+        const TargetAngle = Math.atan2(Player.VY, Speed) * 0.7;
+        let CurrentAngle = SmoothPlayerAngles.has(Player.ID) 
+        ? SmoothPlayerAngles.get(Player.ID) 
+        : TargetAngle;
+        
+        CurrentAngle = Lerp(CurrentAngle, TargetAngle, 0.15);
+        SmoothPlayerAngles.set(Player.ID, CurrentAngle);
+        
+        Ctx.rotate(CurrentAngle);
 
-    // Draw player name above avatar
-    Ctx.font = "bold 22px system-ui, sans-serif";
-    Ctx.textAlign = "center";
-    Ctx.lineWidth = 5;
-    Ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
-    Ctx.fillStyle = "#fff";
-    Ctx.strokeText(Player.PlayerName, 0, -Half - 12);
-    Ctx.fillText(Player.PlayerName, 0, -Half - 12);
-    
-    Ctx.restore();
-  }
+        // Draw cube body
+        Ctx.fillStyle = Player.Color;
+        Ctx.strokeStyle = "#111";
+        Ctx.lineWidth = 4;
+        Ctx.fillRect(-Half, -Half, PlayerSize, PlayerSize);
+        Ctx.strokeRect(-Half, -Half, PlayerSize, PlayerSize);
+
+        // Inner gloss layer
+        Ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+        Ctx.fillRect(-Half + 8, -Half + 8, PlayerSize - 16, PlayerSize - 16);
+
+        // Face / Eye detail
+        Ctx.fillStyle = "#111";
+        Ctx.fillRect(4, -8, 8, 8);
+        Ctx.restore();
+
+        // Draw player name above avatar
+        Ctx.font = "bold 22px system-ui, sans-serif";
+        Ctx.textAlign = "center";
+        Ctx.lineWidth = 5;
+        Ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
+        Ctx.fillStyle = "#fff";
+        Ctx.strokeText(Player.PlayerName, 0, -Half - 12);
+        Ctx.fillText(Player.PlayerName, 0, -Half - 12);
+        
+        Ctx.restore();
+    }
 }
 
-function DrawLeaderboard(Players, X, Y) {
-  // Sort by Alive state first, then by high Score
-  const Sorted = [...Players].sort((A, B) => (B.Alive - A.Alive) || (B.Score - A.Score));
-  const RowHeight = 30;
-  const Width = 300;
-  const Height = 46 + Sorted.length * RowHeight;
+function DrawLeaderboard(Players, Difficulty, X, Y) {
+    // Sort by Alive state first, then by high Score
+    const Sorted = [...Players].sort((A, B) => (B.Alive - A.Alive) || (B.Score - A.Score));
+    const RowHeight = 30;
+    const Width = 300;
+    const Height = 46 + Sorted.length * RowHeight;
 
-  // Background panel
-  Ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
-  Ctx.beginPath();
-  Ctx.roundRect(X, Y, Width, Height, 14);
-  Ctx.fill();
+    // Background panel
+    Ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+    Ctx.beginPath();
+    Ctx.roundRect(X, Y, Width, Height, 14);
+    Ctx.fill();
 
-  // Header text
-  Ctx.textBaseline = "middle";
-  Ctx.textAlign = "left";
-  Ctx.fillStyle = "#fff";
-  Ctx.font = "bold 20px system-ui, sans-serif";
-  Ctx.fillText("Ranking", X + 16, Y + 24);
-
-  // Render rows
-  Sorted.forEach((Player, Index) => {
-    const RowY = Y + 56 + Index * RowHeight;
-    Ctx.globalAlpha = Player.Alive ? 1 : 0.5;
-
-    // Player color indicator square
-    Ctx.fillStyle = Player.Color;
-    Ctx.fillRect(X + 16, RowY - 8, 16, 16);
-
-    // Name text (truncated if too long)
-    Ctx.fillStyle = "#fff";
-    Ctx.font = "18px system-ui, sans-serif";
+    // Header text
+    Ctx.textBaseline = "middle";
     Ctx.textAlign = "left";
-    const Name = Player.PlayerName.length > 14 
-      ? Player.PlayerName.slice(0, 13) + "…" 
-      : Player.PlayerName;
-    
-    Ctx.fillText(`${Index + 1}. ${Name}${Player.Alive ? "" : " ✖"}`, X + 42, RowY);
+    Ctx.fillStyle = "#fff";
+    Ctx.font = "bold 20px system-ui, sans-serif";
+    Ctx.fillText(`Ranking · ${Difficulty}`, X + 16, Y + 24);
 
-    // Score text
-    Ctx.textAlign = "right";
-    Ctx.fillText(`${Player.Score} m`, X + Width - 16, RowY);
-    Ctx.globalAlpha = 1;
-  });
+    // Render rows
+    Sorted.forEach((Player, Index) => {
+        const RowY = Y + 56 + Index * RowHeight;
+        Ctx.globalAlpha = Player.Alive ? 1 : 0.5;
 
-  Ctx.textBaseline = "alphabetic";
+        // Player color indicator square
+        Ctx.fillStyle = Player.Color;
+        Ctx.fillRect(X + 16, RowY - 8, 16, 16);
+
+        // Name text (truncated if too long)
+        Ctx.fillStyle = "#fff";
+        Ctx.font = "18px system-ui, sans-serif";
+        Ctx.textAlign = "left";
+        const Name = Player.PlayerName.length > 14 
+        ? Player.PlayerName.slice(0, 13) + "…" 
+        : Player.PlayerName;
+        
+        Ctx.fillText(`${Index + 1}. ${Name}${Player.Alive ? "" : " ✖"}`, X + 42, RowY);
+
+        // Score text
+        Ctx.textAlign = "right";
+        Ctx.fillText(`${Player.Score} m`, X + Width - 16, RowY);
+        Ctx.globalAlpha = 1;
+    });
+
+    Ctx.textBaseline = "alphabetic";
 }
 
 function DrawCountdown(Value) {
-  Ctx.font = "900 200px system-ui, sans-serif";
-  Ctx.textAlign = "center";
-  Ctx.textBaseline = "middle";
-  Ctx.lineWidth = 12;
-  Ctx.strokeStyle = "rgba(0, 0, 0, 0.6)";
-  Ctx.fillStyle = "#fff";
-  Ctx.strokeText(String(Value), World.Width / 2, World.Height / 2 - 60);
-  Ctx.fillText(String(Value), World.Width / 2, World.Height / 2 - 60);
-  Ctx.textBaseline = "alphabetic";
+    Ctx.font = "900 200px system-ui, sans-serif";
+    Ctx.textAlign = "center";
+    Ctx.textBaseline = "middle";
+    Ctx.lineWidth = 12;
+    Ctx.strokeStyle = "rgba(0, 0, 0, 0.6)";
+    Ctx.fillStyle = "#fff";
+    Ctx.strokeText(String(Value), ViewWidth / 2, World.Height / 2 - 60);
+    Ctx.fillText(String(Value), ViewWidth / 2, World.Height / 2 - 60);
+    Ctx.textBaseline = "alphabetic";
 }
 
 function Frame() {
-  // Dynamic canvas dimensions setup to cover the window seamlessly
-  if (Canvas.clientWidth !== window.innerWidth || Canvas.clientHeight !== window.innerHeight) {
-    Canvas.style.width = "100vw";
-    Canvas.style.height = "100vh";
-    Canvas.style.position = "fixed";
-    Canvas.style.top = "0";
-    Canvas.style.left = "0";
-    Canvas.style.zIndex = "0";
-  }
+    const Now = performance.now();
+    const Dt = Math.min(0.05, (Now - LastFrameTime) / 1000);
+    LastFrameTime = Now;
 
-  const Ratio = window.devicePixelRatio || 1;
-  const Width = Math.round(window.innerWidth * Ratio);
-  const Height = Math.round(window.innerHeight * Ratio);
+    const Ratio = window.devicePixelRatio || 1;
+    const Width = Math.round(Canvas.clientWidth * Ratio);
+    const Height = Math.round(Canvas.clientHeight * Ratio);
 
-  if (Canvas.width !== Width || Canvas.height !== Height) {
-    Canvas.width = Width;
-    Canvas.height = Height;
-  }
-
-  // Locks vertical logic to 900px, allows horizontal width to scale fluidly
-  const Scale = Height / World.Height;
-  World.Width = Width / Scale;
-
-  const ViewLeft = 0;
-  const ViewRight = World.Width;
-  const Time = performance.now() / 1000;
-
-  Ctx.setTransform(Scale, 0, 0, Scale, 0, 0);
-
-  const State = GameVisible ? GetRenderState() : null;
-
-  if (!State) {
-    DrawScenery(Time * 120, ViewLeft, ViewRight);
-  } else {
-    DrawScenery(State.Distance, ViewLeft, ViewRight);
-    DrawSpikes(State.Spikes, State.Distance);
-    DrawPlayers(State.Players, State.Speed, Time);
-    DrawLeaderboard(State.Players, ViewLeft + 20, 20);
-    
-    if (State.Countdown > 0) {
-      DrawCountdown(State.Countdown);
+    if (Canvas.width !== Width || Canvas.height !== Height) {
+        Canvas.width = Width;
+        Canvas.height = Height;
     }
-  }
 
-  requestAnimationFrame(Frame);
+    // Wysokość świata jest stała i wypełnia całe okno, szerokość świata wynika z proporcji ekranu.
+    const Scale = Height / World.Height;
+    ViewWidth = Width / Scale;
+
+    StepGame(Dt);
+
+    const Time = Now / 1000;
+
+    Ctx.setTransform(Scale, 0, 0, Scale, 0, 0);
+
+    if (!CurrentGame) {
+        DrawScenery(Time * 120, 0, ViewWidth);
+    } else {
+        DrawScenery(CurrentGame.Distance, 0, ViewWidth);
+        DrawSpikes(CurrentGame.Spikes, CurrentGame.Distance);
+        DrawPlayers([...CurrentGame.Players.values()], CurrentGame.Speed, Time);
+        DrawLeaderboard([...CurrentGame.Players.values()], CurrentGame.Settings.Label, 20, 20);
+
+        if (CurrentGame.Countdown > 0) {
+        DrawCountdown(Math.ceil(CurrentGame.Countdown));
+        }
+    }
+
+    requestAnimationFrame(Frame);
 }
 
-// Start the loop
 requestAnimationFrame(Frame);
