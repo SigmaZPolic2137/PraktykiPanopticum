@@ -1,0 +1,264 @@
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    height: 100%;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #1d2a33;
+    background: #7cc8f5;
+    overflow: hidden;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(460px, calc(100% - 32px));
+    max-height: calc(100% - 32px);
+    overflow-y: auto;
+    padding: 24px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+
+.panel h1, .panel h2 {
+    margin: 0 0 16px;
+}
+
+.panel.wide {
+    width: min(640px, calc(100% - 32px));
+}
+
+label {
+    display: block;
+    margin: 12px 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 2px solid #c4d3dc;
+    border-radius: 10px;
+    background: #fff;
+}
+
+input:focus {
+    outline: none;
+    border-color: #1e90ff;
+}
+
+button {
+    padding: 12px 18px;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    background: #1e90ff;
+    color: #fff;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+button.secondary {
+    background: #dfe8ee;
+    color: #1d2a33;
+}
+
+button.danger {
+    background: #ff4757;
+}
+
+button.small {
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+.buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.buttons button {
+    flex: 1;
+}
+
+.error {
+    min-height: 20px;
+    margin-top: 12px;
+    color: #d62839;
+    font-weight: 600;
+}
+
+.muted {
+    color: #5b6d78;
+    font-size: 14px;
+}
+
+.address {
+    display: block;
+    margin: 6px 0;
+    font-size: 28px;
+    font-weight: 800;
+    color: #1e90ff;
+    word-break: break-all;
+}
+
+.list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+}
+
+.list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border-radius: 10px;
+    background: #eef3f6;
+}
+
+.list li .name {
+    flex: 1;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 2px solid #111;
+    flex-shrink: 0;
+}
+
+/* Ekran hosta */
+
+#game-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Kontroler na telefonie */
+
+body.controller {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body.controller input {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.room-button {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    background: #eef3f6;
+    color: #1d2a33;
+    border: 2px solid transparent;
+}
+
+.room-button.selected {
+    border-color: #1e90ff;
+}
+
+#controller-screen {
+    touch-action: none;
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: #1d2a33;
+    color: #fff;
+}
+
+#controller-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+}
+
+#controller-top .name {
+    flex: 1;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#controller-status {
+    padding: 0 16px 12px;
+    font-size: 18px;
+    text-align: center;
+    min-height: 2.6em;
+}
+
+#pad {
+    flex: 1;
+    margin: 0 16px 16px;
+    border-radius: 24px;
+    border: 6px solid rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+    background: #3b4a55;
+    transition: transform 0.05s, filter 0.05s;
+}
+
+#pad .arrow {
+    font-size: 96px;
+    line-height: 1;
+}
+
+#pad.pressed {
+    transform: scale(0.97);
+    filter: brightness(1.25);
+}
+
+#pad.disabled {
+    opacity: 0.4;
+}
+
+#controller-screen.hit #pad {
+    animation: shake 0.3s;
+}
+
+@keyframes shake {
+    0%, 100% { translate: 0 0; }
+    25% { translate: -10px 0; }
+    75% { translate: 10px 0; }
+}

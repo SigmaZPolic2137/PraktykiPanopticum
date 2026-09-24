@@ -3,6 +3,8 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import Path from "path";
 import { fileURLToPath } from "url";
+import OS from "os";
+import { Game } from "./game.js";
 
 const App = Express();
 const Http = createServer(App);
@@ -11,9 +13,22 @@ const IO = new Server(Http);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = Path.dirname(__filename);
 
-App.use(Express.static(__dirname));
+App.use(Express.static(Path.join(__dirname, "public")));
 
-// Rooms.set(RoomName, { HostID: string, Password: string || null, MaxPlayers: number });
+// Adresy, pod którymi telefony mogą znaleźć serwer w sieci lokalnej.
+// W kontenerze interfejsy sieciowe mogą być inne niż na hoście, więc dev.sh podaje je w HOST_IPS.
+App.get("/api/addresses", (Request, Response) => {
+    const Addresses = process.env.HOST_IPS
+        ? process.env.HOST_IPS.split(/\s+/).filter(Boolean)
+        : Object.values(OS.networkInterfaces())
+            .flat()
+            .filter(Interface => Interface.family === "IPv4" && !Interface.internal)
+            .map(Interface => Interface.address);
+
+    Response.json({ Addresses, Port });
+});
+
+// Rooms.set(RoomName, { HostID: string, Password: string || null, MaxPlayers: number, Game: Game || null, Timer: Interval || null });
 
 const Rooms = new Map();
 
@@ -182,6 +197,13 @@ async function UpdateRoom(RoomName) {
 }
 
 function CreateRoom(Socket, {RoomName, Password, MaxPlayers}, Callback) {
+    if (Socket.CurrentRoom) {
+        return Callback({
+            Success: false,
+            Message: "Jesteś już w pokoju!",
+        });
+    }
+
     const RoomNameResult = ValidateRoomName(RoomName);
     if (!RoomNameResult.RoomName) {
         return Callback({
@@ -217,6 +239,8 @@ function CreateRoom(Socket, {RoomName, Password, MaxPlayers}, Callback) {
         HostID: Socket.id,
         Password: RealPassword,
         MaxPlayers: RealMaxPlayers,
+        Game: null,
+        Timer: null,
     });
 
     console.log(`Room created: ${RealRoomName}, ${RealMaxPlayers}, ${Socket.id}.`);
@@ -227,13 +251,22 @@ function CreateRoom(Socket, {RoomName, Password, MaxPlayers}, Callback) {
 }
 
 async function CloseRoom(RoomName) {
-    if (!Rooms.has(RoomName)) return;
+    const RoomData = Rooms.get(RoomName);
+    if (!RoomData) return;
+
+    StopGame(RoomData);
 
     IO.to(RoomName).emit("roomClosed");
     
     const SocketsInRoom = await GetSocketsInRoom(RoomName);
 
     Rooms.delete(RoomName);
+
+    const HostSocket = IO.sockets.sockets.get(RoomData.HostID);
+    if (HostSocket) {
+        HostSocket.leave(RoomName);
+        HostSocket.CurrentRoom = null;
+    }
 
 	for (const TargetSocket of SocketsInRoom) {
 		await LeaveRoom(TargetSocket);
@@ -243,11 +276,25 @@ async function CloseRoom(RoomName) {
 }
 
 async function JoinRoom(Socket, {RoomName, PlayerName, Password}, Callback) {
+    if (Socket.CurrentRoom) {
+        return Callback({
+            Success: false,
+            Message: "Jesteś już w pokoju!",
+        });
+    }
+
     const RoomData = Rooms.get(RoomName);
     if (!RoomData) {
         return Callback({
             Success: false,
             Message: "Taki pokój nie istnieje!",
+        });
+    }
+
+    if (RoomData.Game) {
+        return Callback({
+            Success: false,
+            Message: "Gra w tym pokoju już trwa!",
         });
     }
 
@@ -308,6 +355,10 @@ async function LeaveRoom(Socket, Callback) {
     Socket.leave(RoomName);
     Socket.CurrentRoom = null;
 
+    if (RoomData && RoomData.Game) {
+        RoomData.Game.RemovePlayer(Socket.id);
+    }
+
     console.log(`Player left: ${RoomName}, ${Socket.PlayerName || "Anonymous"}, ${Socket.id}.`);
 
     if (Rooms.has(RoomName)) {
@@ -348,6 +399,136 @@ async function KickFromRoom(Socket, {TargetSocketID}, Callback) {
     });
 }
 
+// >:> //
+
+const TickRate = 60;
+const SnapshotEvery = 2;
+
+function StopGame(RoomData) {
+    if (RoomData.Timer) clearInterval(RoomData.Timer);
+    RoomData.Timer = null;
+    RoomData.Game = null;
+}
+
+async function StartGame(Socket, Callback) {
+    const RoomName = Socket.CurrentRoom;
+    const RoomData = Rooms.get(RoomName);
+    if (!RoomData || RoomData.HostID !== Socket.id) {
+        return Callback({
+            Success: false,
+            Message: "Tylko host może rozpocząć grę!",
+        });
+    }
+
+    if (RoomData.Game) {
+        return Callback({
+            Success: false,
+            Message: "Gra już trwa!",
+        });
+    }
+
+    const PlayerSockets = await GetSocketsInRoom(RoomName);
+    if (PlayerSockets.length === 0) {
+        return Callback({
+            Success: false,
+            Message: "W pokoju nie ma żadnych graczy!",
+        });
+    }
+
+    const CurrentGame = new Game(PlayerSockets.map(PlayerSocket => ({
+        ID: PlayerSocket.id,
+        PlayerName: PlayerSocket.PlayerName || "Anonymous",
+    })));
+
+    RoomData.Game = CurrentGame;
+
+    for (const Player of CurrentGame.Players.values()) {
+        IO.to(Player.ID).emit("playerStatus", {
+            State: "countdown",
+            Color: Player.Color,
+        });
+    }
+
+    let Tick = 0;
+    let LastTime = performance.now();
+
+    RoomData.Timer = setInterval(() => {
+        const Now = performance.now();
+        const Dt = Math.min(0.05, (Now - LastTime) / 1000);
+        LastTime = Now;
+
+        for (const Event of CurrentGame.Update(Dt)) {
+            if (Event.Type === "go") {
+                for (const Player of CurrentGame.Players.values()) {
+                    IO.to(Player.ID).emit("playerStatus", { State: "playing", Color: Player.Color });
+                }
+            } else if (Event.Type === "hit") {
+                IO.to(Event.ID).emit("hit");
+            } else if (Event.Type === "eliminated") {
+                IO.to(Event.ID).emit("playerStatus", {
+                    State: "eliminated",
+                    Score: Event.Score,
+                    Place: Event.Place,
+                    Total: CurrentGame.Players.size,
+                });
+            }
+        }
+
+        if (CurrentGame.Over) {
+            FinishGame(RoomName, RoomData, CurrentGame);
+            return;
+        }
+
+        if (++Tick % SnapshotEvery === 0) {
+            IO.to(RoomData.HostID).volatile.emit("gameState", CurrentGame.Snapshot());
+        }
+    }, 1000 / TickRate);
+
+    console.log(`Game started: ${RoomName}, ${PlayerSockets.length} players.`);
+
+    Callback({
+        Success: true,
+    });
+}
+
+function FinishGame(RoomName, RoomData, FinishedGame) {
+    StopGame(RoomData);
+
+    const Results = FinishedGame.Results();
+
+    IO.to(RoomData.HostID).emit("gameState", FinishedGame.Snapshot());
+    IO.to(RoomName).emit("gameOver", { Results });
+
+    console.log(`Game finished: ${RoomName}.`);
+
+    UpdateRoom(RoomName);
+}
+
+function SetInput(Socket, Data) {
+    const RoomData = Rooms.get(Socket.CurrentRoom);
+    if (!RoomData || !RoomData.Game) return;
+
+    RoomData.Game.SetHolding(Socket.id, Boolean(Data && Data.Holding));
+}
+
+async function ListRooms(Callback) {
+    const RoomList = [];
+
+    for (const [RoomName, RoomData] of Rooms) {
+        const PlayerSockets = await GetSocketsInRoom(RoomName);
+
+        RoomList.push({
+            RoomName,
+            Players: PlayerSockets.length,
+            MaxPlayers: RoomData.MaxPlayers,
+            HasPassword: Boolean(RoomData.Password),
+            InGame: Boolean(RoomData.Game),
+        });
+    }
+
+    Callback(RoomList);
+}
+
 // ?:? //
 
 async function HandleDisconnect(Socket) {
@@ -369,10 +550,17 @@ async function HandleDisconnect(Socket) {
 IO.on("connection", (Socket) => {
     console.log(`Device connected: ${Socket.id}.`);
 
-    Socket.on("createRoom", (Data, Callback) => CreateRoom(Socket, Data, Callback));
-    Socket.on("joinRoom", (Data, Callback) => JoinRoom(Socket, Data, Callback));
-    Socket.on("leaveRoom", (Callback) => LeaveRoom(Socket, Callback));
-    Socket.on("kickPlayer", (Data, Callback) => KickFromRoom(Socket, Data, Callback));
+    // Klient może nie przesłać callbacka (albo przesłać śmieci), serwer nie może się przez to wywrócić.
+    const SafeCallback = (Callback) => typeof Callback === "function" ? Callback : () => {};
+    const SafeData = (Data) => Data && typeof Data === "object" ? Data : {};
+
+    Socket.on("createRoom", (Data, Callback) => CreateRoom(Socket, SafeData(Data), SafeCallback(Callback)));
+    Socket.on("joinRoom", (Data, Callback) => JoinRoom(Socket, SafeData(Data), SafeCallback(Callback)));
+    Socket.on("leaveRoom", (Callback) => LeaveRoom(Socket, SafeCallback(Callback)));
+    Socket.on("kickPlayer", (Data, Callback) => KickFromRoom(Socket, SafeData(Data), SafeCallback(Callback)));
+    Socket.on("listRooms", (Callback) => ListRooms(SafeCallback(Callback)));
+    Socket.on("startGame", (Callback) => StartGame(Socket, SafeCallback(Callback)));
+    Socket.on("input", (Data) => SetInput(Socket, Data));
 
     Socket.on("disconnect", async (Reason) => {
         console.log(`Device disconnected: ${Socket.id}, ${Reason}.`);
@@ -381,7 +569,7 @@ IO.on("connection", (Socket) => {
     });
 });
 
-const Port = 3000;
+const Port = Number(process.env.PORT) || 3000;
 
 Http.listen(Port, "0.0.0.0", () => {
     console.log(`Server running on port ${Port}.`);
