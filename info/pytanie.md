@@ -8,7 +8,7 @@ Jest to nasze autorskie rozwiązanie. Alternatywą było zastosowanie mechaniki 
 
 Podczas projektowania gry zespół brał pod uwagę **osoby, które mogą nie mieć wcześniejszego doświadczenia z tego typu grami**. Gra ma być dostępna w szpitalach, gdzie będą z niej korzystać osoby o różnym poziomie doświadczenia i sprawności.
 
-Wybrana przez nas mechanika **pozwala na początku gry oswoić się ze sterowaniem i zasadami rozgrywki**, dzięki czemu gra jest bardziej przystępna i zachęca do dalszego korzystania z niej. **Z tego samego powodu specjalnie zastosowaliśmy również subtelny ruch gracza podczas rozgrywki.** Dzięki temu gra nie jest całkowicie statyczna, a ruch postaci jest bardziej naturalny i łatwiejszy do obserwowania bez wprowadzania nadmiernej ilości efektów wizualnych.
+Wybrana przez nas mechanika **pozwala na początku gry oswoić się ze sterowaniem i zasadami rozgrywki**, dzięki czemu gra jest bardziej przystępna i zachęca do dalszego korzystania z niej. **Z tego samego powodu specjalnie zastosowaliśmy również subtelny ruch gracza podczas rozgrywki.** Dzięki ruch postaci jest bardziej naturalny i łatwiejszy do obserwowania bez wprowadzania nadmiernej ilości efektów wizualnych.
 
 Rozwiązanie to **zmniejsza również frustrację wynikającą z niewielkich błędów.** Spowolnienie zamiast natychmiastowej przegranej daje graczowi więcej czasu na reakcję i pozwala mu kontynuować rozgrywkę. Dzięki temu gra jest mniej karząca i **bardziej zachęca do ponownego podjęcia próby.**
 
