@@ -124,7 +124,7 @@ function ValidateRoomName(RoomName) {
 }
 
 function ValidateRoomPassword(Password) {
-    const MinLength = 6;
+    const MinLength = 3;
     const MaxLength = 32;
 
     if (!Password) {

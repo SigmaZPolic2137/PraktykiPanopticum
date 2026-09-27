@@ -1,9 +1,9 @@
+// Plik obejmuje logikę zarządzania ekranem hosta, komunikację z kontrollerem oraz rysowanie i aktualizawanie gry.
+// Symulację oraz logikę gry obejmuje plik game.js
+
 import { Game, World, PlayerSize, Difficulties } from "./game.js";
 
 const Socket = io();
-
-// Maksymalny krok symulacji, żeby przy niskim FPS gracz nie przeskakiwał przez kolce.
-const MaxStep = 1 / 120;
 
 const Canvas = document.getElementById("game-canvas");
 const Ctx = Canvas.getContext("2d");
@@ -13,10 +13,13 @@ const LobbyScreen = document.getElementById("lobby-screen");
 const ResultsScreen = document.getElementById("results-screen");
 const PlayerList = document.getElementById("player-list");
 const StartButton = document.getElementById("btn-start");
+const AgainButton = document.getElementById("btn-again");
 const DifficultySelect = document.getElementById("difficulty");
 
+const MaxStep = 1 / 120;
+
 let CurrentRoomName = "";
-let SmoothPlayerAngles = new Map();
+let PlayerAngles = new Map();
 let CurrentGame = null;
 let ViewWidth = 1600;
 let LastFrameTime = performance.now();
@@ -109,7 +112,7 @@ function StartGame(ErrorElement) {
 
         document.getElementById(ErrorElement).textContent = "";
         CurrentGame = new Game(Response.Players, ViewWidth, DifficultySelect.value);
-        SmoothPlayerAngles.clear();
+        PlayerAngles.clear();
         ShowScreen(null);
 
         for (const Player of CurrentGame.Players.values()) {
@@ -119,7 +122,7 @@ function StartGame(ErrorElement) {
 }
 
 if (StartButton) StartButton.addEventListener("click", () => StartGame("lobby-error"));
-document.getElementById("btn-again").addEventListener("click", () => StartGame("results-error"));
+if (AgainButton) AgainButton.addEventListener("click", () => StartGame("results-error"));
 
 document.getElementById("btn-lobby").addEventListener("click", () => {
     CurrentGame = null;
@@ -130,7 +133,9 @@ function RenderPlayerList(Players, MaxPlayers) {
     if (!PlayerList) return;
     PlayerList.innerHTML = "";
     document.getElementById("player-count").textContent = `(${Players.length}/${MaxPlayers})`;
+
     if (StartButton) StartButton.disabled = Players.length === 0;
+    if (AgainButton) AgainButton.disabled = Players.length === 0;
 
     if (Players.length === 0) {
         PlayerList.innerHTML = '<li class="muted">Czekam na graczy…</li>';
@@ -164,7 +169,7 @@ Socket.on("playerLeft", ({ ID }) => {
     if (CurrentGame) CurrentGame.RemovePlayer(ID);
 });
 
-// D:D //  Symulacja
+// D:D //
 
 function SendToPlayer(ID, Event, Payload) {
     Socket.emit("toPlayer", { ID, Event, Payload });
@@ -188,25 +193,29 @@ function HandleGameEvent(Event) {
 }
 
 function StepGame(Dt) {
-    if (!CurrentGame || CurrentGame.Over) return;
+    if (!CurrentGame) return;
 
-    CurrentGame.SetWidth(ViewWidth);
+    if (!CurrentGame.Over) {
+        CurrentGame.SetWidth(ViewWidth);
 
-    const Steps = Math.ceil(Dt / MaxStep);
-    for (let I = 0; I < Steps && !CurrentGame.Over; I++) {
-        for (const Event of CurrentGame.Update(Dt / Steps)) HandleGameEvent(Event);
+        const Steps = Math.ceil(Dt / MaxStep);
+        for (let I = 0; I < Steps && !CurrentGame.Over; I++) {
+            for (const Event of CurrentGame.Update(Dt / Steps)) HandleGameEvent(Event);
+        }
     }
 
     if (CurrentGame.Over) {
         const Results = CurrentGame.Results();
         Socket.emit("finishGame", { Results });
         ShowResults(Results);
+        CurrentGame = null;
     }
 }
 
 function ShowResults(Results) {
     const List = document.getElementById("results-list");
     if (!List) return;
+
     List.innerHTML = "";
 
     for (const Result of Results) {
@@ -391,9 +400,8 @@ function DrawPlayers(Players, Speed, Time) {
     const Half = PlayerSize / 2;
     const CurrentPlayerIDs = new Set(Players.map(P => P.ID));
 
-    // Clean up disconnected players from rotation cache
-    for (const ID of SmoothPlayerAngles.keys()) {
-        if (!CurrentPlayerIDs.has(ID)) SmoothPlayerAngles.delete(ID);
+    for (const ID of PlayerAngles.keys()) {
+        if (!CurrentPlayerIDs.has(ID)) PlayerAngles.delete(ID);
     }
 
     for (const Player of Players) {
@@ -402,25 +410,23 @@ function DrawPlayers(Players, Speed, Time) {
         Ctx.save();
         Ctx.translate(Player.X, Player.Y);
 
-        // Flashing effect if slowed
         if (Player.SlowTimer > 0) {
-        Ctx.globalAlpha = 0.45 + 0.4 * Math.abs(Math.sin(Time * 18));
+            Ctx.globalAlpha = 0.45 + 0.4 * Math.abs(Math.sin(Time * 18));
         }
 
         Ctx.save();
         
-        // Smooth angle rotation
         const TargetAngle = Math.atan2(Player.VY, Speed) * 0.7;
-        let CurrentAngle = SmoothPlayerAngles.has(Player.ID) 
-        ? SmoothPlayerAngles.get(Player.ID) 
-        : TargetAngle;
+        let CurrentAngle = PlayerAngles.has(Player.ID) 
+            ? PlayerAngles.get(Player.ID) 
+            : TargetAngle;
         
         CurrentAngle = Lerp(CurrentAngle, TargetAngle, 0.15);
-        SmoothPlayerAngles.set(Player.ID, CurrentAngle);
+        PlayerAngles.set(Player.ID, CurrentAngle);
         
         Ctx.rotate(CurrentAngle);
 
-        // Draw cube body
+        // Cube body
         Ctx.fillStyle = Player.Color;
         Ctx.strokeStyle = "#111";
         Ctx.lineWidth = 4;
@@ -436,14 +442,14 @@ function DrawPlayers(Players, Speed, Time) {
         Ctx.fillRect(4, -8, 8, 8);
         Ctx.restore();
 
-        // Draw player name above avatar
+        // Player name above avatar
         Ctx.font = "bold 22px system-ui, sans-serif";
         Ctx.textAlign = "center";
         Ctx.lineWidth = 5;
         Ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
         Ctx.fillStyle = "#fff";
-        Ctx.strokeText(Player.PlayerName, 0, -Half - 12);
-        Ctx.fillText(Player.PlayerName, 0, -Half - 12);
+        Ctx.strokeText(Player.PlayerName, 0, -Half - 24);
+        Ctx.fillText(Player.PlayerName, 0, -Half - 24);
         
         Ctx.restore();
     }

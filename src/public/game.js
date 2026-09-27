@@ -1,3 +1,6 @@
+// Plik obejmuję logikę, ustawienia i symulację gry oraz przekazywanie o niej informacji do hosta.
+// Clasa Game
+
 // Symulacja jednej rozgrywki. Działa w przeglądarce hosta, który jest jedynym źródłem prawdy o stanie gry;
 // telefony wysyłają przez serwer tylko informację, czy gracz trzyma przycisk.
 
@@ -5,19 +8,18 @@
 // więc sufit i ziemia zawsze pokrywają się z krawędziami ekranu.
 export const World = {
     Height: 900,
+    BaseWidth: 1600,
     GroundY: 800,
     CeilingY: 0,
 };
 
-export const PlayerSize = 44;
-const PlayerHitRadius = 17;
+export const PlayerSize = 48;
 
-// Gracz rozpędza się do przodu, ale najdalej do 3/4 szerokości ekranu.
+const PlayerHitRadius = 17;
 const TargetFraction = 0.75;
 const StartFraction = 0.3;
 const ForwardAccel = 90;
 const MaxForwardSpeed = 180;
-
 const VerticalAccel = 4200;
 
 // Spacing: odstęp między układami kolców, na pełnej trudności mnożony przez (1 - SpacingRamp).
@@ -29,7 +31,7 @@ export const Difficulties = {
         Spacing: [700, 1100], SpacingRamp: 0.3,
         MaxGroup: 2, HeightScale: 0.8,
         Gap: [380, 440], GapShrink: 40,
-        SlowDuration: 1.3, SlowDriftSpeed: 170,
+        SlowDuration: 1.4, SlowDriftSpeed: 160,
         Patterns: { Ground: 0.35, Ceiling: 0.35, Big: 0.1, Gap: 0.2, Tunnel: 0 },
     },
     medium: {
@@ -38,8 +40,8 @@ export const Difficulties = {
         Spacing: [480, 860], SpacingRamp: 0.4,
         MaxGroup: 3, HeightScale: 1,
         Gap: [300, 360], GapShrink: 70,
-        SlowDuration: 1.8, SlowDriftSpeed: 220,
-        Patterns: { Ground: 0.3, Ceiling: 0.25, Big: 0.2, Gap: 0.25, Tunnel: 0 },
+        SlowDuration: 1.8, SlowDriftSpeed: 240,
+        Patterns: { Ground: 0.3, Ceiling: 0.3, Big: 0.2, Gap: 0.2, Tunnel: 0.05 },
     },
     hard: {
         Label: "Trudny",
@@ -47,7 +49,7 @@ export const Difficulties = {
         Spacing: [180, 360], SpacingRamp: 0.35,
         MaxGroup: 5, HeightScale: 1.12,
         Gap: [230, 270], GapShrink: 40,
-        SlowDuration: 2.2, SlowDriftSpeed: 260,
+        SlowDuration: 2.2, SlowDriftSpeed: 280,
         Patterns: { Ground: 0.2, Ceiling: 0.2, Big: 0.2, Gap: 0.2, Tunnel: 0.2 },
     },
 };
@@ -146,20 +148,29 @@ export class Game {
         });
     }
 
+    // Od 0 na starcie do 1 po RampTime sekundach.
+    get Difficulty() {
+        return Math.min(1, this.Time / this.Settings.RampTime);
+    }
+
     get TargetX() {
         return this.Width * TargetFraction;
     }
 
-    // Wywoływane przy zmianie rozmiaru okna hosta.
-    SetWidth(Width) {
-        this.Width = Width;
-        for (const Player of this.Players.values()) Player.X = Math.min(Player.X, this.TargetX);
+    get horizontalScale() {
+        return this.Width / World.BaseWidth;
     }
 
     get AliveCount() {
         let Count = 0;
         for (const Player of this.Players.values()) if (Player.Alive) Count++;
         return Count;
+    }
+
+    // Wywoływane przy zmianie rozmiaru okna hosta.
+    SetWidth(Width) {
+        this.Width = Width;
+        for (const Player of this.Players.values()) Player.X = Math.min(Player.X, this.TargetX);
     }
 
     SetHolding(ID, Holding) {
@@ -197,6 +208,14 @@ export class Game {
         const Half = PlayerSize / 2;
         const MaxVY = this.Speed * 0.95;
 
+        const HScale = this.horizontalScale;
+
+        const ScaledSlowDriftSpeed = this.Settings.SlowDriftSpeed * HScale;
+        const ScaledMaxForwardSpeed = MaxForwardSpeed * HScale;
+        const ScaledForwardAcceleration = ForwardAccel * HScale;
+
+        const Elasticity = 4.0; 
+
         for (const Player of this.Players.values()) {
             if (!Player.Alive) continue;
 
@@ -214,13 +233,27 @@ export class Game {
 
             if (Player.SlowTimer > 0) {
                 Player.SlowTimer -= Dt;
-                Player.VX = -this.Settings.SlowDriftSpeed;
+            }
+
+            let targetVX = 0;
+            if (Player.SlowTimer > 0) {
+                targetVX = -ScaledSlowDriftSpeed;
             } else {
-                // Po spowolnieniu gracz od razu zaczyna znowu przyspieszać, bez wytracania cofania.
-                Player.VX = Math.min(MaxForwardSpeed, Math.max(0, Player.VX) + ForwardAccel * Dt);
+                targetVX = ScaledMaxForwardSpeed;
+            }
+
+            const HorizontalAccelerationRate = ScaledForwardAcceleration * Elasticity;
+            Player.VX = Approach(Player.VX, targetVX, HorizontalAccelerationRate * Dt);
+
+            if (Player.SlowTimer <= 0 && Player.X < this.TargetX && Player.VX > 0) {
+                const DistanceToTarget = this.TargetX - Player.X;
+                if (Player.VX > DistanceToTarget) {
+                    Player.VX = DistanceToTarget;
+                }
             }
 
             Player.X += Player.VX * Dt;
+
             if (Player.X >= this.TargetX) {
                 Player.X = this.TargetX;
                 Player.VX = 0;
@@ -261,11 +294,6 @@ export class Game {
 
     AddSpike(X, Y, W, H, Dir) {
         this.Spikes.push({ ID: this.NextSpikeID++, X, Y, W, H, Dir });
-    }
-
-    // Od 0 na starcie do 1 po RampTime sekundach.
-    get Difficulty() {
-        return Math.min(1, this.Time / this.Settings.RampTime);
     }
 
     SpawnSpikes() {

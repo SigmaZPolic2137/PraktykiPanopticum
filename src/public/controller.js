@@ -38,7 +38,7 @@ function RefreshRooms() {
         RoomList.innerHTML = "";
 
         if (Rooms.length === 0) {
-            RoomList.innerHTML = '<p class="muted">Brak pokoi. Utwórz pokój na komputerze (host.html).</p>';
+            RoomList.innerHTML = '<p class="muted">Brak pokoi. Utwórz pokój na ekranie (host.html).</p>';
             return;
         }
 
@@ -52,7 +52,7 @@ function RefreshRooms() {
             Name.textContent = (Room.HasPassword ? "🔒 " : "") + Room.RoomName;
 
             const Info = document.createElement("span");
-            Info.textContent = Room.InGame ? "gra trwa" : `${Room.Players}/${Room.MaxPlayers}`;
+            Info.textContent = Room.InGame ? "Gra trwa..." : `${Room.Players}/${Room.MaxPlayers}`;
 
             Button.append(Name, Info);
             Button.onclick = () => {
