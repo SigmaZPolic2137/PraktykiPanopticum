@@ -1,67 +1,77 @@
+<!--
+    Copyright (C) 2026 SigmaZPolic2137
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+-->
+
 <!DOCTYPE html>
 <html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Panopticum – host</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
-</head>
-<body>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Panopticum – host</title>
+        <link rel="stylesheet" href="style.css">
+        <script defer src="/socket.io/socket.io.js"></script>
+        <script type="module" src="host.js"></script>
+    </head>
 
-    <canvas id="game-canvas"></canvas>
+    <body>
+        <canvas id="game-canvas"></canvas>
 
-    <!-- Tworzenie pokoju -->
-    <div id="create-screen" class="panel">
-        <h1>Nowa gra</h1>
+        <!-- Tworzenie pokoju -->
+        <div id="create-screen" class="panel">
+            <h1>Nowa gra</h1>
 
-        <label for="room-name">Nazwa pokoju</label>
-        <input type="text" id="room-name" maxlength="64" autocomplete="off">
+            <label for="room-name">Nazwa pokoju</label>
+            <input type="text" id="room-name" maxlength="64" autocomplete="off">
 
-        <label for="room-password">Hasło (opcjonalnie, 3–32 znaki)</label>
-        <input type="text" id="room-password" maxlength="32" autocomplete="off">
+            <label for="room-password">Hasło (opcjonalnie, 3–32 znaki)</label>
+            <input type="text" id="room-password" maxlength="32" autocomplete="off">
 
-        <label for="room-max-players">Maksymalna liczba graczy (1–16)</label>
-        <input type="number" id="room-max-players" min="1" max="16" value="8">
+            <label for="room-max-players">Maksymalna liczba graczy (1–16)</label>
+            <input type="number" id="room-max-players" min="1" max="16" value="8">
 
-        <div class="buttons">
-            <button id="btn-create">Utwórz pokój</button>
+            <div class="buttons">
+                <button id="btn-create">Utwórz pokój</button>
+            </div>
+            <div id="create-error" class="error"></div>
         </div>
-        <div id="create-error" class="error"></div>
-    </div>
 
-    <!-- Lobby -->
-    <div id="lobby-screen" class="panel wide hidden">
-        <h2 id="lobby-title"></h2>
+        <!-- Lobby -->
+        <div id="lobby-screen" class="panel wide hidden">
+            <h2 id="lobby-title"></h2>
 
-        <p class="muted">Na telefonie (w tej samej sieci Wi-Fi) otwórz:</p>
-        <div id="join-addresses"></div>
+            <p class="muted">Na telefonie (w tej samej sieci Wi-Fi) otwórz:</p>
+            <div id="join-addresses"></div>
 
-        <h3>Gracze <span id="player-count" class="muted"></span></h3>
-        <ul id="player-list" class="list"></ul>
+            <h3>Gracze <span id="player-count" class="muted"></span></h3>
+            <ul id="player-list" class="list"></ul>
 
-        <label for="difficulty">Poziom trudności</label>
-        <select id="difficulty"></select>
+            <label for="difficulty">Poziom trudności</label>
+            <select id="difficulty"></select>
 
-        <div class="buttons">
-            <button class="secondary" id="btn-close">Zamknij pokój</button>
-            <button id="btn-start" disabled>Start</button>
+            <div class="buttons">
+                <button class="secondary" id="btn-close">Zamknij pokój</button>
+                <button id="btn-start" disabled>Start</button>
+            </div>
+            <div id="lobby-error" class="error"></div>
         </div>
-        <div id="lobby-error" class="error"></div>
-    </div>
 
-    <!-- Wyniki -->
-    <div id="results-screen" class="panel hidden">
-        <h2>Koniec gry!</h2>
-        <ul id="results-list" class="list"></ul>
+        <!-- Wyniki -->
+        <div id="results-screen" class="panel hidden">
+            <h2>Koniec gry!</h2>
+            <ul id="results-list" class="list"></ul>
 
-        <div class="buttons">
-            <button class="secondary" id="btn-lobby">Lobby</button>
-            <button id="btn-again">Zagraj ponownie</button>
+            <div class="buttons">
+                <button class="secondary" id="btn-lobby">Lobby</button>
+                <button id="btn-again">Zagraj ponownie</button>
+            </div>
+            <div id="results-error" class="error"></div>
         </div>
-        <div id="results-error" class="error"></div>
-    </div>
 
-    <script type="module" src="host.js"></script>
-</body>
+        <script type="module" src="host.js"></script>
+    </body>
 </html>

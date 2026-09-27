@@ -1,3 +1,12 @@
+/*
+    Copyright (C) 2026 SigmaZPolic2137
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+*/
+
 const Socket = io();
 
 const JoinScreen = document.getElementById("join-screen");
@@ -209,7 +218,7 @@ Socket.on("hit", () => {
 
     setTimeout(() => {
         if (Playing) SetStatus("Leć! Unikaj kolców.");
-    }, 1800);
+    }, 2000);
 });
 
 Socket.on("gameOver", ({ Results }) => {

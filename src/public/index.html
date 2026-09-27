@@ -1,53 +1,62 @@
+<!--
+    Copyright (C) 2026 SigmaZPolic2137
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+-->
+
 <!DOCTYPE html>
 <html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <meta name="theme-color" content="#1d2a33">
-    <title>Panopticum – kontroler</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
-</head>
-<body class="controller">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+        <meta name="theme-color" content="#1d2a33">
+        <title>Panopticum – kontroler</title>
+        <link rel="stylesheet" href="style.css">
+        <script defer src="/socket.io/socket.io.js"></script>
+        <script defer src="controller.js"></script>
+    </head>
 
-    <!-- Dołączanie do pokoju -->
-    <div id="join-screen" class="panel">
-        <h1>Dołącz do gry</h1>
+    <body class="controller">
 
-        <label for="player-name">Twoja nazwa</label>
-        <input type="text" id="player-name" maxlength="24" autocomplete="off" placeholder="np. Tomasz">
+        <!-- Dołączanie do pokoju -->
+        <div id="join-screen" class="panel">
+            <h1>Dołącz do gry</h1>
 
-        <label>Pokoje</label>
-        <div id="room-list"><p class="muted">Szukam pokoi…</p></div>
+            <label for="player-name">Twoja nazwa:</label>
+            <input type="text" id="player-name" maxlength="24" autocomplete="off" placeholder="np. Tomasz">
 
-        <label for="room-name">Nazwa pokoju</label>
-        <input type="text" id="room-name" maxlength="64" autocomplete="off" placeholder="Wybierz z listy lub wpisz">
+            <label>Pokoje:</label>
+            <div id="room-list"><p class="muted">Szukam pokoi…</p></div>
 
-        <label for="room-password">Hasło (jeśli pokój ma hasło)</label>
-        <input type="password" id="room-password" maxlength="32" autocomplete="off">
+            <label for="room-name">Nazwa pokoju:</label>
+            <input type="text" id="room-name" maxlength="64" autocomplete="off" placeholder="Wybierz z listy lub wpisz">
 
-        <div class="buttons">
-            <button id="btn-join">Dołącz</button>
+            <label for="room-password">Hasło (jeśli pokój ma hasło):</label>
+            <input type="password" id="room-password" maxlength="32" autocomplete="off">
+
+            <div class="buttons">
+                <button id="btn-join">Dołącz</button>
+            </div>
+            <div id="join-error" class="error"></div>
+
+            <p class="muted">Komputer z grą to <a href="host.html">host.html</a>.</p>
         </div>
-        <div id="join-error" class="error"></div>
 
-        <p class="muted">Komputer z grą to <a href="host.html">host.html</a>.</p>
-    </div>
-
-    <!-- Kontroler -->
-    <div id="controller-screen" class="hidden">
-        <div id="controller-top">
-            <span class="dot" id="my-color"></span>
-            <span class="name" id="my-name"></span>
-            <button class="small secondary" id="btn-leave">Wyjdź</button>
+        <!-- Kontroler -->
+        <div id="controller-screen" class="hidden">
+            <div id="controller-top">
+                <span class="dot" id="my-color"></span>
+                <span class="name" id="my-name"></span>
+                <button class="small secondary" id="btn-leave">Wyjdź</button>
+            </div>
+            <div id="controller-status">Czekam, aż host rozpocznie grę…</div>
+            <div id="pad" class="disabled">
+                <span class="arrow">⬆</span>
+                <span>TRZYMAJ</span>
+            </div>
         </div>
-        <div id="controller-status">Czekam, aż host rozpocznie grę…</div>
-        <div id="pad" class="disabled">
-            <span class="arrow">⬆</span>
-            <span>TRZYMAJ</span>
-        </div>
-    </div>
-
-    <script src="controller.js"></script>
-</body>
+    </body>
 </html>
