@@ -1,7 +1,7 @@
 {
   "name": "praktykipanopticum",
   "version": "1.0.0",
-  "description": "helloworld",
+  "description": "Game made with Socket.io and node.js",
   "main": "src/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,8 +11,8 @@
     "url": "git+https://github.com/SigmaZPolic2137/PraktykiPanopticum.git"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "SigmaZPolic2137",
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "bugs": {
     "url": "https://github.com/SigmaZPolic2137/PraktykiPanopticum/issues"
@@ -20,6 +20,7 @@
   "homepage": "https://github.com/SigmaZPolic2137/PraktykiPanopticum#readme",
   "dependencies": {
     "express": "^5.2.1",
+    "qrcode": "^1.5.4",
     "socket.io": "^4.8.3"
   }
 }
