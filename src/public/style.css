@@ -46,7 +46,7 @@ html, body {
     width: min(640px, calc(100% - 32px));
 }
 
-label {
+label, .p-label {
     display: block;
     margin: 12px 0 4px;
     font-size: 14px;

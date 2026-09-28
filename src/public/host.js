@@ -23,6 +23,7 @@ const ResultsScreen = document.getElementById("results-screen");
 const PlayerList = document.getElementById("player-list");
 const StartButton = document.getElementById("btn-start");
 const AgainButton = document.getElementById("btn-again");
+const LobbyButton = document.getElementById("btn-lobby");
 const DifficultySelect = document.getElementById("difficulty");
 
 const MaxStep = 1 / 120;
@@ -32,6 +33,7 @@ let PlayerAngles = new Map();
 let CurrentGame = null;
 let ViewWidth = 1600;
 let LastFrameTime = performance.now();
+let GameRendering = false;
 
 document.getElementById("room-name").value = "Pokój " + Math.floor(1000 + Math.random() * 9000);
 
@@ -120,9 +122,12 @@ function StartGame(ErrorElement) {
         }
 
         document.getElementById(ErrorElement).textContent = "";
+
         CurrentGame = new Game(Response.Players, ViewWidth, DifficultySelect.value);
         PlayerAngles.clear();
         ShowScreen(null);
+
+        GameRendering = true;
 
         for (const Player of CurrentGame.Players.values()) {
             SendToPlayer(Player.ID, "playerStatus", { State: "countdown", Color: Player.Color });
@@ -133,8 +138,9 @@ function StartGame(ErrorElement) {
 if (StartButton) StartButton.addEventListener("click", () => StartGame("lobby-error"));
 if (AgainButton) AgainButton.addEventListener("click", () => StartGame("results-error"));
 
-document.getElementById("btn-lobby").addEventListener("click", () => {
+if (LobbyButton) LobbyButton.addEventListener("click", () => {
     CurrentGame = null;
+    GameRendering = false;
     ShowScreen(LobbyScreen);
 });
 
@@ -171,11 +177,15 @@ function RenderPlayerList(Players, MaxPlayers) {
 Socket.on("roomUpdate", (Data) => RenderPlayerList(Data.PlayerSockets, Data.MaxPlayers));
 
 Socket.on("input", ({ ID, Holding }) => {
-    if (CurrentGame) CurrentGame.SetHolding(ID, Holding);
+    if (CurrentGame && !CurrentGame.Over) {
+        CurrentGame.SetHolding(ID, Holding);
+    }
 });
 
 Socket.on("playerLeft", ({ ID }) => {
-    if (CurrentGame) CurrentGame.RemovePlayer(ID);
+    if (CurrentGame && !CurrentGame.Over) {
+        CurrentGame.RemovePlayer(ID);
+    }
 });
 
 // D:D //
@@ -213,11 +223,12 @@ function StepGame(Dt) {
         }
     }
 
-    if (CurrentGame.Over) {
+    if (CurrentGame.Over && GameRendering) {
+        GameRendering = false;
+
         const Results = CurrentGame.Results();
         Socket.emit("finishGame", { Results });
         ShowResults(Results);
-        CurrentGame = null;
     }
 }
 
@@ -254,6 +265,7 @@ Socket.on("disconnect", () => {
 
     CurrentRoomName = "";
     CurrentGame = null;
+    GameRendering = false;
     ShowScreen(CreateScreen);
     document.getElementById("create-error").textContent = "Utracono połączenie z serwerem – pokój został zamknięty.";
 });
