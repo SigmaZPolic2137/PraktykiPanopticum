@@ -22,6 +22,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = Path.dirname(__filename);
 
 App.use(Express.static(Path.join(__dirname, "public")));
+App.use('/modules/qrcode-esm', Express.static(Path.join(__dirname, "..", '/node_modules/qrcode-esm/build')));
 
 // Adresy, pod którymi klient (np. telefon lub przeglądarka) może znaleźć serwer.
 // Najpierw sprawdzamy, czy zapytanie przyszło przez zewnętrzną domenę/tunel.

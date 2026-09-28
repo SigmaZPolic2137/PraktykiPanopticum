@@ -7,6 +7,18 @@
     License, or (at your option) any later version.
 */
 
+// QRCODE LIB TEST //
+
+import { toCanvas } from "/modules/qrcode-esm/qrcode.esm.js";
+
+const test = document.createElement("canvas");
+
+await toCanvas(test, "helloworld");
+
+document.getElementById("join-screen").append(test);
+
+// Działa :3
+
 const Socket = io();
 
 const JoinScreen = document.getElementById("join-screen");

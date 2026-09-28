@@ -20,7 +20,7 @@
   "homepage": "https://github.com/SigmaZPolic2137/PraktykiPanopticum#readme",
   "dependencies": {
     "express": "^5.2.1",
-    "qrcode": "^1.5.4",
+    "qrcode-esm": "^1.5.1",
     "socket.io": "^4.8.3"
   }
 }
