@@ -84,8 +84,8 @@ button:disabled {
 }
 
 button.secondary {
-    background: #dfe8ee;
-    color: #1d2a33;
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
 }
 
 button.danger {

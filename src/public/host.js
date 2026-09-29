@@ -20,6 +20,8 @@ const Ctx = Canvas.getContext("2d");
 const CreateScreen = document.getElementById("create-screen");
 const LobbyScreen = document.getElementById("lobby-screen");
 const ResultsScreen = document.getElementById("results-screen");
+const PauseScreen = document.getElementById("pause-screen");
+const PauseButton = document.getElementById("btn-pause");
 const PlayerList = document.getElementById("player-list");
 const StartButton = document.getElementById("btn-start");
 const AgainButton = document.getElementById("btn-again");
@@ -45,7 +47,7 @@ DifficultySelect.value = "medium";
 // (:) //
 
 function ShowScreen(Screen) {
-    for (const Element of [CreateScreen, LobbyScreen, ResultsScreen]) {
+    for (const Element of [CreateScreen, LobbyScreen, ResultsScreen, PauseScreen]) {
         if (Element) Element.classList.toggle("hidden", Element !== Screen);
     }
 }
@@ -126,6 +128,7 @@ function StartGame(ErrorElement) {
         CurrentGame = new Game(Response.Players, ViewWidth, DifficultySelect.value);
         PlayerAngles.clear();
         ShowScreen(null);
+        PauseButton.classList.remove("hidden");
 
         GameRendering = true;
 
@@ -194,11 +197,16 @@ function SendToPlayer(ID, Event, Payload) {
     Socket.emit("toPlayer", { ID, Event, Payload });
 }
 
+function SendToAlive(State) {
+    for (const Player of CurrentGame.Players.values()) {
+        if (Player.Alive) SendToPlayer(Player.ID, "playerStatus", { State, Color: Player.Color });
+    }
+}
+
 function HandleGameEvent(Event) {
     if (Event.Type === "go") {
-        for (const Player of CurrentGame.Players.values()) {
-            SendToPlayer(Player.ID, "playerStatus", { State: "playing", Color: Player.Color });
-        }
+        // Po wznowieniu z pauzy wyeliminowani gracze nie mogą znowu dostać sterowania.
+        SendToAlive("playing");
     } else if (Event.Type === "hit") {
         SendToPlayer(Event.ID, "hit", {});
     } else if (Event.Type === "eliminated") {
@@ -225,6 +233,7 @@ function StepGame(Dt) {
 
     if (CurrentGame.Over && GameRendering) {
         GameRendering = false;
+        PauseButton.classList.add("hidden");
 
         const Results = CurrentGame.Results();
         Socket.emit("finishGame", { Results });
@@ -232,10 +241,59 @@ function StepGame(Dt) {
     }
 }
 
-function ShowResults(Results) {
-    const List = document.getElementById("results-list");
-    if (!List) return;
+// (:) //  Pauza – menu podobne do ekranu wyników; "Kontynuuj" wznawia grę po odliczaniu.
 
+function PauseGame() {
+    if (!CurrentGame || CurrentGame.Over || CurrentGame.Paused) return;
+
+    CurrentGame.Pause();
+    SendToAlive("paused");
+
+    // Aktualny ranking w tej samej kolejności co tabela w rogu ekranu.
+    const Standings = [...CurrentGame.Players.values()]
+        .sort((A, B) => (B.Alive - A.Alive) || (B.Score - A.Score))
+        .map((Player, Index) => ({ ...Player, Place: Index + 1 }));
+    RenderResultList(document.getElementById("pause-list"), Standings);
+
+    PauseButton.classList.add("hidden");
+    ShowScreen(PauseScreen);
+}
+
+function ResumeGame() {
+    if (!CurrentGame || !CurrentGame.Paused) return;
+
+    CurrentGame.Resume();
+    SendToAlive("countdown");
+
+    PauseButton.classList.remove("hidden");
+    ShowScreen(null);
+}
+
+// Wyjście do lobby kończy rundę – serwer i telefony dostają wyniki tak jak po normalnym końcu gry.
+function EndGameToLobby() {
+    if (!CurrentGame || !GameRendering) return;
+
+    GameRendering = false;
+    Socket.emit("finishGame", { Results: CurrentGame.Results() });
+
+    CurrentGame = null;
+    PauseButton.classList.add("hidden");
+    ShowScreen(LobbyScreen);
+}
+
+PauseButton.addEventListener("click", PauseGame);
+document.getElementById("btn-continue").addEventListener("click", ResumeGame);
+document.getElementById("btn-pause-lobby").addEventListener("click", EndGameToLobby);
+
+document.addEventListener("keydown", (Event) => {
+    if (Event.repeat || (Event.code !== "Escape" && Event.code !== "KeyP")) return;
+    if (!CurrentGame || CurrentGame.Over) return;
+
+    if (CurrentGame.Paused) ResumeGame();
+    else PauseGame();
+});
+
+function RenderResultList(List, Results) {
     List.innerHTML = "";
 
     for (const Result of Results) {
@@ -250,11 +308,18 @@ function ShowResults(Results) {
         Name.textContent = `${Result.Place}. ${Result.PlayerName}`;
 
         const Score = document.createElement("span");
-        Score.textContent = `${Result.Score} m`;
+        Score.textContent = `${Result.Score} m${Result.Alive === false ? " ✖" : ""}`;
 
         Item.append(Dot, Name, Score);
         List.appendChild(Item);
     }
+}
+
+function ShowResults(Results) {
+    const List = document.getElementById("results-list");
+    if (!List) return;
+
+    RenderResultList(List, Results);
 
     document.getElementById("results-error").textContent = "";
     ShowScreen(ResultsScreen);
@@ -266,6 +331,7 @@ Socket.on("disconnect", () => {
     CurrentRoomName = "";
     CurrentGame = null;
     GameRendering = false;
+    PauseButton.classList.add("hidden");
     ShowScreen(CreateScreen);
     document.getElementById("create-error").textContent = "Utracono połączenie z serwerem – pokój został zamknięty.";
 });
@@ -568,8 +634,12 @@ function Frame() {
         DrawPlayers([...CurrentGame.Players.values()], CurrentGame.Speed, Time);
         DrawLeaderboard([...CurrentGame.Players.values()], CurrentGame.Settings.Label, 20, 20);
 
-        if (CurrentGame.Countdown > 0) {
-        DrawCountdown(Math.ceil(CurrentGame.Countdown));
+        if (CurrentGame.Paused) {
+            // Przyciemnione tło pod menu pauzy.
+            Ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+            Ctx.fillRect(0, 0, ViewWidth, World.Height);
+        } else if (CurrentGame.Countdown > 0) {
+            DrawCountdown(Math.ceil(CurrentGame.Countdown));
         }
     }
 

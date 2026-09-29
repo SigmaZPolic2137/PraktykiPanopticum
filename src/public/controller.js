@@ -32,6 +32,8 @@ const MyColor = document.getElementById("my-color");
 const MyName = document.getElementById("my-name");
 const Status = document.getElementById("controller-status");
 const Pad = document.getElementById("pad");
+const PadArrow = document.getElementById("pad-arrow");
+const PadLabel = document.getElementById("pad-label");
 
 let InRoom = false;
 let Playing = false;
@@ -128,6 +130,7 @@ function ShowController(PlayerName) {
 function ShowJoin(Message) {
     InRoom = false;
     SetPlaying(false);
+    SetPadPaused(false);
 
     ControllerScreen.classList.add("hidden");
     JoinScreen.classList.remove("hidden");
@@ -138,6 +141,12 @@ function ShowJoin(Message) {
 
 function SetStatus(Text) {
     Status.textContent = Text;
+}
+
+// Podczas pauzy przycisk pokazuje, że gra stoi.
+function SetPadPaused(Value) {
+    PadArrow.textContent = Value ? "⏸" : "⬆";
+    PadLabel.textContent = Value ? "PAUZA" : "TRZYMAJ";
 }
 
 function SetPlaying(Value) {
@@ -205,9 +214,15 @@ Socket.on("playerStatus", (Data) => {
         Pad.style.background = Data.Color;
     }
 
+    SetPadPaused(Data.State === "paused");
+
     if (Data.State === "countdown") {
         SetPlaying(false);
         SetStatus("Przygotuj się! Trzymaj, żeby lecieć w górę, puść, żeby spadać.");
+    } else if (Data.State === "paused") {
+        SetPlaying(false);
+        SetStatus("Gra została zatrzymana przez hosta. Po wznowieniu będzie odliczanie.");
+        if (navigator.vibrate) navigator.vibrate(100);
     } else if (Data.State === "playing") {
         SetPlaying(true);
         // Gracz mógł już trzymać palec na przycisku podczas odliczania.
@@ -235,6 +250,7 @@ Socket.on("hit", () => {
 
 Socket.on("gameOver", ({ Results }) => {
     SetPlaying(false);
+    SetPadPaused(false);
 
     const Mine = Results.find(Result => Result.ID === Socket.id);
     const Summary = Mine ? `Koniec gry! Miejsce ${Mine.Place}/${Results.length}, dystans ${Mine.Score} m.` : "Koniec gry!";

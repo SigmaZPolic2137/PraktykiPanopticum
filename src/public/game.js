@@ -136,6 +136,7 @@ export class Game {
         this.NextSpawnX = Width + 200;
         this.Players = new Map();
         this.Over = false;
+        this.Paused = false;
 
         const Spacing = (World.GroundY - 240) / Math.max(PlayerList.length, 1);
 
@@ -187,6 +188,18 @@ export class Game {
         if (Player) Player.Holding = Holding;
     }
 
+    // Pauza zatrzymuje symulację; po wznowieniu gra ponownie odlicza, tak jak przy starcie.
+    Pause() {
+        if (this.Over) return;
+        this.Paused = true;
+    }
+
+    Resume() {
+        if (!this.Paused) return;
+        this.Paused = false;
+        this.Countdown = CountdownSeconds;
+    }
+
     RemovePlayer(ID) {
         this.Players.delete(ID);
         if (this.AliveCount === 0) this.Over = true;
@@ -195,7 +208,7 @@ export class Game {
     // Zwraca listę zdarzeń: { Type: "go" | "hit" | "eliminated", ... }
     Update(Dt) {
         const Events = [];
-        if (this.Over) return Events;
+        if (this.Over || this.Paused) return Events;
 
         if (this.Countdown > 0) {
             this.Countdown -= Dt;
