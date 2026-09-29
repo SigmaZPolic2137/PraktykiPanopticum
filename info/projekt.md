@@ -6,7 +6,7 @@
 
 # Plan projektu
 
-### Cele na kolejne tygodnie
+### Cele na kolejne tygodnie (cyfra za każdy tydzień)
 
 1. **Prototyp aplikacji** - przygotowanie podstawowej struktury komunikacji pomiędzy serwerem a klientem.
 2. **Wersja beta** - działająca gra, testy oraz praca nad grafiką.
@@ -52,7 +52,7 @@ Rozwiązania te umożliwiają komunikację w czasie rzeczywistym, jednak wymagaj
 
 ## Najważniejsze ryzyka
 
-Największym zagrożeniem jest **nieprawidłowa synchronizacja stanu gry pomiędzy użytkownikami**. Aby temu zapobiec, serwer powinien być głównym źródłem informacji o stanie gry, a dane otrzymywane od klientów powinny być walidowane.
+Największym zagrożeniem jest **nieprawidłowa synchronizacja stanu gry pomiędzy użytkownikami**. Aby temu zapobiec, serwer powinien być głównym źródłem prawdziwych informacji, a dane otrzymywane od klientów powinny być walidowane.
 
 Drugim istotnym ryzykiem jest **zbyt późne wykrycie błędów**. Testy powinny być wykonywane już od etapu prototypu, a nie dopiero przed publikacją.
 
