@@ -114,6 +114,55 @@ button.small {
     font-weight: 600;
 }
 
+/* Odliczanie automatycznego startu pokazywane w polu błędu lobby/wyników */
+.error.info {
+    color: #1e90ff;
+    font-size: 18px;
+}
+
+label.check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+label.check input {
+    width: auto;
+    margin: 2px 0 0;
+    accent-color: #1e90ff;
+}
+
+.badge {
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.badge.ready {
+    background: #2ed573;
+}
+
+.badge.not-ready {
+    background: #ff4757;
+}
+
+/* Przycisk gotowości na telefonie: czerwony – nie gotowy, zielony – gotowy */
+.ready-button {
+    background: #ff4757;
+    transition: background 0.15s;
+}
+
+.ready-button.ready {
+    background: #2ed573;
+    color: #0b3d1d;
+}
+
 .muted {
     color: #5b6d78;
     font-size: 14px;
@@ -125,6 +174,47 @@ button.small {
     font-size: 28px;
     font-weight: 800;
     color: #1e90ff;
+    word-break: break-all;
+}
+
+/* Adres do dołączenia z przyciskami "Kopiuj" i "QR" */
+
+.address-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+}
+
+.address-row .address {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+}
+
+.address-row button {
+    flex-shrink: 0;
+}
+
+#qr-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    margin: 10px auto 0;
+    padding: 10px;
+    border-radius: 12px;
+    background: #fff;
+    border: 2px solid #c4d3dc;
+}
+
+#qr-canvas {
+    display: block;
+}
+
+#qr-caption {
+    font-size: 12px;
     word-break: break-all;
 }
 

@@ -55,7 +55,8 @@ App.get("/api/addresses", (Request, Response) => {
     });
 });
 
-// Rooms.set(RoomName, { HostID: string, Password: string || null, MaxPlayers: number, InGame: boolean });
+// Rooms.set(RoomName, { HostID: string, Password: string || null, MaxPlayers: number, InGame: boolean, AutoStart: boolean });
+// AutoStart: gracze zgłaszają gotowość, a gdy wszyscy są gotowi, host sam rozpoczyna grę po odliczaniu.
 // Gra jest symulowana w przeglądarce hosta, serwer tylko przekazuje wiadomości między hostem a telefonami.
 
 const Rooms = new Map();
@@ -216,6 +217,7 @@ async function UpdateRoom(RoomName) {
 	const FormattedPlayers = PlayerSockets.map(Socket => ({
 		ID: Socket.id,
 		PlayerName: Socket.PlayerName || "Anonymous",
+		Ready: Boolean(Socket.Ready),
 	}));
 
 	IO.to(RoomData.HostID).emit("roomUpdate", {
@@ -224,7 +226,7 @@ async function UpdateRoom(RoomName) {
 	});
 }
 
-function CreateRoom(Socket, {RoomName, Password, MaxPlayers}, Callback) {
+function CreateRoom(Socket, {RoomName, Password, MaxPlayers, AutoStart}, Callback) {
     if (Socket.CurrentRoom) {
         return Callback({
             Success: false,
@@ -268,6 +270,7 @@ function CreateRoom(Socket, {RoomName, Password, MaxPlayers}, Callback) {
         Password: RealPassword,
         MaxPlayers: RealMaxPlayers,
         InGame: false,
+        AutoStart: Boolean(AutoStart),
     });
 
     console.log(`Room created: ${RealRoomName}, ${RealMaxPlayers}, ${Socket.id}.`);
@@ -351,6 +354,7 @@ async function JoinRoom(Socket, {RoomName, PlayerName, Password}, Callback) {
 
     Socket.PlayerName = RealPlayerName;
     Socket.CurrentRoom = RoomName;
+    Socket.Ready = false;
     Socket.join(RoomName);
 
     console.log(`Player joined: ${RoomName}, ${RealPlayerName}, ${Socket.id}.`);
@@ -359,6 +363,7 @@ async function JoinRoom(Socket, {RoomName, PlayerName, Password}, Callback) {
 
     Callback({
         Success: true,
+        AutoStart: RoomData.AutoStart,
     });
 }
 
@@ -379,6 +384,7 @@ async function LeaveRoom(Socket, Callback) {
 
     Socket.leave(RoomName);
     Socket.CurrentRoom = null;
+    Socket.Ready = false;
 
     if (RoomData && RoomData.InGame) {
         IO.to(RoomData.HostID).emit("playerLeft", { ID: Socket.id });
@@ -460,6 +466,10 @@ async function StartGame(Socket, Callback) {
 
     RoomData.InGame = true;
 
+    // Po każdej grze gracze zgłaszają gotowość od nowa.
+    for (const PlayerSocket of PlayerSockets) PlayerSocket.Ready = false;
+    UpdateRoom(RoomName);
+
     console.log(`Game started: ${RoomName}, ${PlayerSockets.length} players.`);
 
     Callback({
@@ -498,6 +508,30 @@ function FinishGame(Socket, { Results }) {
     console.log(`Game finished: ${RoomName}.`);
 
     UpdateRoom(RoomName);
+}
+
+// Przycisk gotowości z telefonu; działa tylko w pokojach z automatycznym startem i między rundami.
+async function SetReady(Socket, { Ready }, Callback) {
+    const RoomName = Socket.CurrentRoom;
+    const RoomData = Rooms.get(RoomName);
+    if (!RoomData || RoomData.HostID === Socket.id || !RoomData.AutoStart) {
+        return Callback({ Success: false });
+    }
+
+    if (RoomData.InGame) {
+        return Callback({
+            Success: false,
+            Message: "Gra już trwa!",
+        });
+    }
+
+    Socket.Ready = Boolean(Ready);
+    await UpdateRoom(RoomName);
+
+    Callback({
+        Success: true,
+        Ready: Socket.Ready,
+    });
 }
 
 // Stan przycisku z telefonu trafia prosto do hosta, który symuluje grę.
@@ -560,6 +594,7 @@ IO.on("connection", (Socket) => {
     Socket.on("input", (Data) => SetInput(Socket, Data));
     Socket.on("toPlayer", (Data) => SendToPlayer(Socket, SafeData(Data)));
     Socket.on("finishGame", (Data) => FinishGame(Socket, SafeData(Data)));
+    Socket.on("setReady", (Data, Callback) => SetReady(Socket, SafeData(Data), SafeCallback(Callback)));
 
     Socket.on("disconnect", async (Reason) => {
         console.log(`Device disconnected: ${Socket.id}, ${Reason}.`);

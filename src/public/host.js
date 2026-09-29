@@ -11,6 +11,7 @@
 // Symulację oraz logikę gry obejmuje plik game.js
 
 import { Game, World, PlayerSize, Difficulties } from "./game.js";
+import { toCanvas } from "/modules/qrcode-esm/qrcode.esm.js";
 
 const Socket = io();
 
@@ -36,6 +37,13 @@ let CurrentGame = null;
 let ViewWidth = 1600;
 let LastFrameTime = performance.now();
 let GameRendering = false;
+let QrUrl = null;
+let AutoStart = false;
+let LastPlayers = [];
+let AutoStartTimer = null;
+let AutoStartSeconds = 0;
+
+const AutoStartDelay = 5;
 
 document.getElementById("room-name").value = "Pokój " + Math.floor(1000 + Math.random() * 9000);
 
@@ -77,11 +85,44 @@ async function ShowJoinAddresses() {
     }
 
     Container.innerHTML = "";
+    QrUrl = null;
+    RenderQr();
+
     for (const Url of [...new Set(Urls)]) {
+        const Row = document.createElement("div");
+        Row.className = "address-row";
+
         const Element = document.createElement("span");
         Element.className = "address";
         Element.textContent = Url;
-        Container.appendChild(Element);
+
+        const CopyButton = document.createElement("button");
+        CopyButton.className = "small secondary";
+        CopyButton.textContent = "Kopiuj";
+        CopyButton.title = "Skopiuj link do schowka";
+        CopyButton.onclick = async () => {
+            const Copied = await CopyText(Url);
+            CopyButton.textContent = Copied ? "Skopiowano ✓" : "Błąd";
+            setTimeout(() => CopyButton.textContent = "Kopiuj", 1500);
+        };
+
+        const QrButton = document.createElement("button");
+        QrButton.className = "small secondary qr-button";
+        QrButton.textContent = "QR";
+        QrButton.title = "Pokaż kod QR tego linku";
+        QrButton.onclick = () => {
+            // Na ekranie jest tylko jeden kod QR; ponowne kliknięcie go chowa.
+            QrUrl = QrUrl === Url ? null : Url;
+
+            for (const Button of Container.querySelectorAll(".qr-button")) {
+                Button.classList.toggle("secondary", Button !== QrButton || !QrUrl);
+            }
+
+            RenderQr();
+        };
+
+        Row.append(Element, CopyButton, QrButton);
+        Container.appendChild(Row);
     }
 
     if (Urls.length === 0) {
@@ -89,18 +130,58 @@ async function ShowJoinAddresses() {
     }
 }
 
+async function RenderQr() {
+    const Box = document.getElementById("qr-box");
+    Box.classList.toggle("hidden", !QrUrl);
+    if (!QrUrl) return;
+
+    document.getElementById("qr-caption").textContent = QrUrl;
+
+    try {
+        await toCanvas(document.getElementById("qr-canvas"), QrUrl, { width: 220, margin: 1 });
+    } catch {
+        Box.classList.add("hidden");
+    }
+}
+
+// Kopiowanie jak Ctrl + C. Clipboard API działa tylko na localhost i https,
+// więc gdy host.html jest otwarty przez adres IP, używamy starszej metody.
+async function CopyText(Text) {
+    try {
+        await navigator.clipboard.writeText(Text);
+        return true;
+    } catch {
+        const Area = document.createElement("textarea");
+        Area.value = Text;
+        Area.style.position = "fixed";
+        Area.style.opacity = "0";
+        document.body.appendChild(Area);
+        Area.select();
+
+        let Copied = false;
+        try {
+            Copied = document.execCommand("copy");
+        } catch {}
+
+        Area.remove();
+        return Copied;
+    }
+}
+
 document.getElementById("btn-create").addEventListener("click", () => {
     const RoomName = document.getElementById("room-name").value;
     const Password = document.getElementById("room-password").value;
     const MaxPlayers = document.getElementById("room-max-players").value;
+    const RoomAutoStart = document.getElementById("room-auto-start").checked;
 
-    Socket.emit("createRoom", { RoomName, Password, MaxPlayers }, (Response) => {
+    Socket.emit("createRoom", { RoomName, Password, MaxPlayers, AutoStart: RoomAutoStart }, (Response) => {
         if (!Response.Success) {
             document.getElementById("create-error").textContent = Response.Message;
             return;
         }
 
         CurrentRoomName = RoomName.trim();
+        AutoStart = RoomAutoStart;
         document.getElementById("lobby-title").textContent = `Pokój: ${CurrentRoomName}`;
         document.getElementById("create-error").textContent = "";
         RenderPlayerList([], MaxPlayers || 8);
@@ -112,11 +193,15 @@ document.getElementById("btn-create").addEventListener("click", () => {
 document.getElementById("btn-close").addEventListener("click", () => {
     Socket.emit("leaveRoom", () => {
         CurrentRoomName = "";
+        AutoStart = false;
+        CancelAutoStart();
         ShowScreen(CreateScreen);
     });
 });
 
 function StartGame(ErrorElement) {
+    CancelAutoStart();
+
     Socket.emit("startGame", (Response) => {
         if (!Response.Success) {
             document.getElementById(ErrorElement).textContent = Response.Message;
@@ -145,12 +230,84 @@ if (LobbyButton) LobbyButton.addEventListener("click", () => {
     CurrentGame = null;
     GameRendering = false;
     ShowScreen(LobbyScreen);
+
+    // Trwające odliczanie przenosimy z ekranu wyników do lobby.
+    CancelAutoStart();
+    CheckAutoStart();
 });
+
+// (:) //  Automatyczny start: gdy wszyscy gracze są gotowi, w lobby albo na ekranie wyników
+// pojawia się 5-sekundowe odliczanie, po którym gra startuje bez udziału hosta.
+
+function AutoStartElement() {
+    if (!LobbyScreen.classList.contains("hidden")) return document.getElementById("lobby-error");
+    if (!ResultsScreen.classList.contains("hidden")) return document.getElementById("results-error");
+    return null;
+}
+
+function CheckAutoStart() {
+    const AllReady = AutoStart && CurrentRoomName && !GameRendering && AutoStartElement()
+        && LastPlayers.length > 0 && LastPlayers.every(Player => Player.Ready);
+
+    if (!AllReady) {
+        CancelAutoStart();
+        return;
+    }
+
+    if (AutoStartTimer) return;
+
+    AutoStartSeconds = AutoStartDelay;
+    ShowAutoStartCountdown();
+
+    AutoStartTimer = setInterval(() => {
+        AutoStartSeconds--;
+
+        if (AutoStartSeconds > 0) {
+            ShowAutoStartCountdown();
+            return;
+        }
+
+        const Element = AutoStartElement();
+        CancelAutoStart();
+        if (Element) StartGame(Element.id);
+    }, 1000);
+}
+
+function ShowAutoStartCountdown() {
+    const Element = AutoStartElement();
+    if (!Element) {
+        CancelAutoStart();
+        return;
+    }
+
+    Element.classList.add("info");
+    Element.textContent = `Wszyscy gracze są gotowi! Gra rozpocznie się za ${AutoStartSeconds}…`;
+}
+
+// Ktoś przestał być gotowy, wyszedł, dołączył albo gra wystartowała ręcznie.
+function CancelAutoStart() {
+    clearInterval(AutoStartTimer);
+    AutoStartTimer = null;
+
+    // Czyścimy tylko tekst odliczania, prawdziwe błędy zostają.
+    for (const ID of ["lobby-error", "results-error"]) {
+        const Element = document.getElementById(ID);
+        if (Element.classList.contains("info")) {
+            Element.textContent = "";
+            Element.classList.remove("info");
+        }
+    }
+}
 
 function RenderPlayerList(Players, MaxPlayers) {
     if (!PlayerList) return;
     PlayerList.innerHTML = "";
-    document.getElementById("player-count").textContent = `(${Players.length}/${MaxPlayers})`;
+    LastPlayers = Players;
+
+    const ReadyCount = Players.filter(Player => Player.Ready).length;
+    document.getElementById("player-count").textContent = AutoStart && Players.length > 0
+        ? `(${Players.length}/${MaxPlayers}) · Gotowi (${ReadyCount}/${Players.length})`
+        : `(${Players.length}/${MaxPlayers})`;
 
     if (StartButton) StartButton.disabled = Players.length === 0;
     if (AgainButton) AgainButton.disabled = Players.length === 0;
@@ -166,18 +323,29 @@ function RenderPlayerList(Players, MaxPlayers) {
         const Name = document.createElement("span");
         Name.className = "name";
         Name.textContent = Player.PlayerName;
+        Item.append(Name);
+
+        if (AutoStart) {
+            const ReadyBadge = document.createElement("span");
+            ReadyBadge.className = "badge " + (Player.Ready ? "ready" : "not-ready");
+            ReadyBadge.textContent = Player.Ready ? "Gotowy" : "Nie gotowy";
+            Item.append(ReadyBadge);
+        }
 
         const KickButton = document.createElement("button");
         KickButton.className = "small danger";
         KickButton.textContent = "Wyrzuć";
         KickButton.onclick = () => Socket.emit("kickPlayer", { TargetSocketID: Player.ID }, () => {});
 
-        Item.append(Name, KickButton);
+        Item.append(KickButton);
         PlayerList.appendChild(Item);
     }
 }
 
-Socket.on("roomUpdate", (Data) => RenderPlayerList(Data.PlayerSockets, Data.MaxPlayers));
+Socket.on("roomUpdate", (Data) => {
+    RenderPlayerList(Data.PlayerSockets, Data.MaxPlayers);
+    CheckAutoStart();
+});
 
 Socket.on("input", ({ ID, Holding }) => {
     if (CurrentGame && !CurrentGame.Over) {
@@ -329,6 +497,8 @@ Socket.on("disconnect", () => {
     if (!CurrentRoomName) return;
 
     CurrentRoomName = "";
+    AutoStart = false;
+    CancelAutoStart();
     CurrentGame = null;
     GameRendering = false;
     PauseButton.classList.add("hidden");

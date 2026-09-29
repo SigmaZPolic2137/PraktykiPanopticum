@@ -7,18 +7,6 @@
     License, or (at your option) any later version.
 */
 
-// QRCODE LIB TEST //
-
-import { toCanvas } from "/modules/qrcode-esm/qrcode.esm.js";
-
-const test = document.createElement("canvas");
-
-await toCanvas(test, "helloworld");
-
-document.getElementById("join-screen").append(test);
-
-// Działa :3
-
 const Socket = io();
 
 const JoinScreen = document.getElementById("join-screen");
@@ -32,10 +20,13 @@ const MyColor = document.getElementById("my-color");
 const MyName = document.getElementById("my-name");
 const Status = document.getElementById("controller-status");
 const Pad = document.getElementById("pad");
+const ReadyButton = document.getElementById("btn-ready");
 const PadArrow = document.getElementById("pad-arrow");
 const PadLabel = document.getElementById("pad-label");
 
 let InRoom = false;
+let AutoStart = false;
+let Ready = false;
 let Playing = false;
 let Holding = false;
 const ActivePointers = new Set();
@@ -104,6 +95,7 @@ document.getElementById("btn-join").addEventListener("click", () => {
             return;
         }
 
+        AutoStart = Boolean(Response.AutoStart);
         Storage("PlayerName", PlayerName.trim());
         ShowController(PlayerName.trim());
     });
@@ -113,13 +105,43 @@ document.getElementById("btn-leave").addEventListener("click", () => {
     Socket.emit("leaveRoom", () => ShowJoin(""));
 });
 
+// Przycisk gotowości – widoczny tylko, gdy host włączył automatyczny start, i tylko między rundami.
+// Czerwony: nie gotowy, zielony: gotowy. Gdy wszyscy są gotowi, gra startuje sama po odliczaniu.
+ReadyButton.addEventListener("click", () => {
+    Socket.emit("setReady", { Ready: !Ready }, (Response) => {
+        if (!Response.Success) return;
+
+        SetReady(Response.Ready);
+        SetStatus(LobbyStatus());
+    });
+});
+
+function SetReady(Value) {
+    Ready = Value;
+    ReadyButton.textContent = Value ? "Gotowy ✓" : "Nie gotowy ✗";
+    ReadyButton.classList.toggle("ready", Value);
+}
+
+function ShowReadyButton(Value) {
+    ReadyButton.classList.toggle("hidden", !Value || !AutoStart);
+    if (!Value) SetReady(false);
+}
+
+function LobbyStatus() {
+    if (!AutoStart) return "Czekam, aż host rozpocznie grę…";
+    if (!Ready) return "Naciśnij czerwony przycisk „Nie gotowy”, gdy będziesz gotowy do gry.";
+    return "Jesteś gotowy! Gra wystartuje, gdy wszyscy będą gotowi.";
+}
+
 // D:D //
 
 function ShowController(PlayerName) {
     InRoom = true;
     MyName.textContent = PlayerName;
     MyColor.style.background = "transparent";
-    SetStatus("Czekam, aż host rozpocznie grę…");
+    SetReady(false);
+    ShowReadyButton(true);
+    SetStatus(LobbyStatus());
     SetPlaying(false);
     Pad.style.background = "";
 
@@ -129,6 +151,7 @@ function ShowController(PlayerName) {
 
 function ShowJoin(Message) {
     InRoom = false;
+    ShowReadyButton(false);
     SetPlaying(false);
     SetPadPaused(false);
 
@@ -216,6 +239,9 @@ Socket.on("playerStatus", (Data) => {
 
     SetPadPaused(Data.State === "paused");
 
+    // W trakcie gry gotowość nie ma znaczenia; serwer i tak ją zeruje na starcie.
+    ShowReadyButton(false);
+
     if (Data.State === "countdown") {
         SetPlaying(false);
         SetStatus("Przygotuj się! Trzymaj, żeby lecieć w górę, puść, żeby spadać.");
@@ -255,7 +281,8 @@ Socket.on("gameOver", ({ Results }) => {
     const Mine = Results.find(Result => Result.ID === Socket.id);
     const Summary = Mine ? `Koniec gry! Miejsce ${Mine.Place}/${Results.length}, dystans ${Mine.Score} m.` : "Koniec gry!";
 
-    SetStatus(`${Summary} Czekaj na kolejną rundę…`);
+    ShowReadyButton(true);
+    SetStatus(`${Summary} ${AutoStart ? LobbyStatus() : "Czekaj na kolejną rundę…"}`);
 });
 
 Socket.on("roomClosed", () => ShowJoin("Host zamknął pokój."));

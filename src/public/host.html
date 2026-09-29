@@ -34,6 +34,11 @@
             <label for="room-max-players">Maksymalna liczba graczy (1–16)</label>
             <input type="number" id="room-max-players" min="1" max="16" value="8">
 
+            <label class="check">
+                <input type="checkbox" id="room-auto-start" checked>
+                <span>Gra startuje sama, gdy wszyscy gracze są gotowi</span>
+            </label>
+
             <div class="buttons">
                 <button id="btn-create">Utwórz pokój</button>
             </div>
@@ -46,6 +51,12 @@
 
             <p class="muted">Na telefonie (w tej samej sieci Wi-Fi) otwórz:</p>
             <div id="join-addresses"></div>
+
+            <!-- Jeden kod QR dla adresu wybranego przyciskiem "QR" -->
+            <div id="qr-box" class="hidden">
+                <canvas id="qr-canvas"></canvas>
+                <span id="qr-caption" class="muted"></span>
+            </div>
 
             <h3>Gracze <span id="player-count" class="muted"></span></h3>
             <ul id="player-list" class="list"></ul>
