@@ -50,6 +50,16 @@
             <h2 id="lobby-title"></h2>
 
             <p class="muted">Na telefonie (w tej samej sieci Wi-Fi) otwórz:</p>
+
+            <!-- Dodaje ?room=...(&password=...) do linków, żeby gracz nie musiał tego wpisywać -->
+            <label class="check">
+                <input type="checkbox" id="link-room">
+                <span>Dodaj nazwę pokoju do linku</span>
+            </label>
+            <label class="check hidden" id="link-password-option">
+                <input type="checkbox" id="link-password">
+                <span>Dodaj hasło pokoju do linku</span>
+            </label>
             <div id="join-addresses"></div>
 
             <!-- Jeden kod QR dla adresu wybranego przyciskiem "QR" -->

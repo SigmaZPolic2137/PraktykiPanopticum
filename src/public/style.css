@@ -94,7 +94,9 @@ button.danger {
 
 button.small {
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: 12px;
+    line-height: 1.2;
+    border: 1px solid transparent;
 }
 
 .buttons {
@@ -136,13 +138,19 @@ label.check input {
 
 .badge {
     padding: 6px 10px;
-    font-size: 13px;
     border-radius: 10px;
     font-size: 12px;
     font-weight: 700;
     color: #fff;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+    border: 1px solid transparent; 
+    box-sizing: border-box;
 }
+
 
 .badge.ready {
     background: #2ed573;
@@ -360,4 +368,93 @@ body.controller input {
     0%, 100% { translate: 0 0; }
     25% { translate: -10px 0; }
     75% { translate: 10px 0; }
+}
+
+#controller-top button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.address {
+    display: block;
+    margin: 6px 0;
+    font-size: 28px;
+    font-weight: 800;
+    color: #1e90ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Dłuższy link (z nazwą pokoju/hasłem) nieco mniejszą czcionką */
+.address.long {
+    font-size: 14px;
+}
+
+/* Lista pokoi z przyciskiem odświeżania */
+.room-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 12px 0 6px;
+}
+
+.room-header .p-label {
+    margin: 0;
+}
+
+/* Linki do ekranu hosta i kodu źródłowego */
+.footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #dfe8ee;
+}
+
+.link-card {
+    flex: 1 1 180px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background: #eef3f6;
+    color: #1d2a33;
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.link-card:hover, .link-card:focus-visible {
+    border-color: #1e90ff;
+    background: #fff;
+    outline: none;
+}
+
+.link-icon {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    font-size: 22px;
+    line-height: 24px;
+    text-align: center;
+}
+
+.link-text strong, .link-text small {
+    display: block;
+}
+
+.link-text small {
+    color: #5b6d78;
+    font-size: 12px;
 }

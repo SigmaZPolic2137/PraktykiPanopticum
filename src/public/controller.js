@@ -40,46 +40,77 @@ function Storage(Key, Value) {
     }
 }
 
-PlayerNameInput.value = Storage("PlayerName");
-RoomNameInput.value = new URLSearchParams(location.search).get("room") || "";
+// Link z lobby hosta może zawierać nazwę pokoju i hasło (?room=...&password=...),
+// wtedy gracz wpisuje już tylko swoją nazwę.
+const LinkParams = new URLSearchParams(location.search);
 
-// (:) //
+PlayerNameInput.value = Storage("PlayerName");
+RoomNameInput.value = LinkParams.get("room") || "";
+RoomPasswordInput.value = LinkParams.get("password") || "";
+
+if (RoomNameInput.value && !PlayerNameInput.value) PlayerNameInput.focus();
+
+// (:) //  Lista pokoi
+
+const RefreshButton = document.getElementById("btn-refresh");
+const RefreshCooldown = 2000;
+
+let LastRooms = [];
+
+// Serwer sam wysyła nową listę, gdy ktoś utworzy lub zamknie pokój (albo zmieni się liczba graczy).
+Socket.on("roomList", (Rooms) => {
+    LastRooms = Array.isArray(Rooms) ? Rooms : [];
+    if (!InRoom) RenderRooms();
+});
 
 function RefreshRooms() {
     if (InRoom || !Socket.connected) return;
 
     Socket.emit("listRooms", (Rooms) => {
-        RoomList.innerHTML = "";
-
-        if (Rooms.length === 0) {
-            RoomList.innerHTML = '<p class="muted">Brak pokoi. Utwórz pokój na ekranie (host.html).</p>';
-            return;
-        }
-
-        for (const Room of Rooms) {
-            const Button = document.createElement("button");
-            Button.className = "room-button";
-            Button.classList.toggle("selected", Room.RoomName === RoomNameInput.value);
-            Button.disabled = Room.InGame || Room.Players >= Room.MaxPlayers;
-
-            const Name = document.createElement("span");
-            Name.textContent = (Room.HasPassword ? "🔒 " : "") + Room.RoomName;
-
-            const Info = document.createElement("span");
-            Info.textContent = Room.InGame ? "Gra trwa..." : `${Room.Players}/${Room.MaxPlayers}`;
-
-            Button.append(Name, Info);
-            Button.onclick = () => {
-                RoomNameInput.value = Room.RoomName;
-                RefreshRooms();
-            };
-
-            RoomList.appendChild(Button);
-        }
+        LastRooms = Array.isArray(Rooms) ? Rooms : [];
+        RenderRooms();
     });
 }
 
-setInterval(RefreshRooms, 2000);
+// Ręczne odświeżanie, najwyżej raz na 2 sekundy.
+RefreshButton.addEventListener("click", () => {
+    RefreshRooms();
+
+    RefreshButton.disabled = true;
+    setTimeout(() => RefreshButton.disabled = false, RefreshCooldown);
+});
+
+function RenderRooms() {
+    RoomList.innerHTML = "";
+
+    if (LastRooms.length === 0) {
+        RoomList.innerHTML = '<p class="muted">Brak pokoi. Utwórz pokój na ekranie (host.html).</p>';
+        return;
+    }
+
+    for (const Room of LastRooms) {
+        const Button = document.createElement("button");
+        Button.className = "room-button";
+        Button.classList.toggle("selected", Room.RoomName === RoomNameInput.value);
+        Button.disabled = Room.InGame || Room.Players >= Room.MaxPlayers;
+
+        const Name = document.createElement("span");
+        Name.textContent = (Room.HasPassword ? "🔒 " : "") + Room.RoomName;
+
+        const Info = document.createElement("span");
+        Info.textContent = Room.InGame ? "Gra trwa..." : `${Room.Players}/${Room.MaxPlayers}`;
+
+        Button.append(Name, Info);
+        Button.onclick = () => {
+            RoomNameInput.value = Room.RoomName;
+            RenderRooms();
+        };
+
+        RoomList.appendChild(Button);
+    }
+}
+
+RoomNameInput.addEventListener("input", RenderRooms);
 Socket.on("connect", RefreshRooms);
 
 document.getElementById("btn-join").addEventListener("click", () => {

@@ -38,6 +38,8 @@ let ViewWidth = 1600;
 let LastFrameTime = performance.now();
 let GameRendering = false;
 let QrUrl = null;
+let BaseUrls = [];
+let CurrentPassword = "";
 let AutoStart = false;
 let LastPlayers = [];
 let AutoStartTimer = null;
@@ -84,16 +86,39 @@ async function ShowJoinAddresses() {
         Urls.unshift(location.origin);
     }
 
-    Container.innerHTML = "";
+    BaseUrls = [...new Set(Urls)];
     QrUrl = null;
-    RenderQr();
+    RenderJoinAddresses();
+}
 
-    for (const Url of [...new Set(Urls)]) {
+// Adres z opcjonalną nazwą pokoju i hasłem, np. http://192.168.0.2:3000/?room=Pok%C3%B3j%201234
+function JoinUrl(BaseUrl) {
+    const Params = new URLSearchParams();
+
+    if (document.getElementById("link-room").checked) {
+        Params.set("room", CurrentRoomName);
+        if (CurrentPassword && document.getElementById("link-password").checked) Params.set("password", CurrentPassword);
+    }
+
+    const Query = Params.toString();
+    return Query ? `${BaseUrl}/?${Query}` : BaseUrl;
+}
+
+function RenderJoinAddresses() {
+    const Container = document.getElementById("join-addresses");
+    Container.innerHTML = "";
+
+    // Opcja hasła ma sens tylko w pokoju z hasłem i gdy nazwa pokoju jest w linku.
+    document.getElementById("link-password-option").classList.toggle("hidden", !CurrentPassword || !document.getElementById("link-room").checked);
+
+    for (const BaseUrl of BaseUrls) {
+        const Url = JoinUrl(BaseUrl);
         const Row = document.createElement("div");
         Row.className = "address-row";
 
         const Element = document.createElement("span");
         Element.className = "address";
+        Element.classList.toggle("long", Url !== BaseUrl);
         Element.textContent = Url;
 
         const CopyButton = document.createElement("button");
@@ -107,38 +132,39 @@ async function ShowJoinAddresses() {
         };
 
         const QrButton = document.createElement("button");
-        QrButton.className = "small secondary qr-button";
+        QrButton.className = "small qr-button" + (QrUrl === BaseUrl ? "" : " secondary");
         QrButton.textContent = "QR";
         QrButton.title = "Pokaż kod QR tego linku";
         QrButton.onclick = () => {
             // Na ekranie jest tylko jeden kod QR; ponowne kliknięcie go chowa.
-            QrUrl = QrUrl === Url ? null : Url;
-
-            for (const Button of Container.querySelectorAll(".qr-button")) {
-                Button.classList.toggle("secondary", Button !== QrButton || !QrUrl);
-            }
-
-            RenderQr();
+            QrUrl = QrUrl === BaseUrl ? null : BaseUrl;
+            RenderJoinAddresses();
         };
 
         Row.append(Element, CopyButton, QrButton);
         Container.appendChild(Row);
     }
 
-    if (Urls.length === 0) {
+    if (BaseUrls.length === 0) {
         Container.textContent = "Nie udało się ustalić adresu IP komputera – sprawdź go poleceniem `ip addr` lub `ipconfig`.";
     }
+
+    RenderQr();
 }
+
+document.getElementById("link-room").addEventListener("change", RenderJoinAddresses);
+document.getElementById("link-password").addEventListener("change", RenderJoinAddresses);
 
 async function RenderQr() {
     const Box = document.getElementById("qr-box");
     Box.classList.toggle("hidden", !QrUrl);
     if (!QrUrl) return;
 
-    document.getElementById("qr-caption").textContent = QrUrl;
+    const Url = JoinUrl(QrUrl);
+    document.getElementById("qr-caption").textContent = Url;
 
     try {
-        await toCanvas(document.getElementById("qr-canvas"), QrUrl, { width: 220, margin: 1 });
+        await toCanvas(document.getElementById("qr-canvas"), Url, { width: 220, margin: 1 });
     } catch {
         Box.classList.add("hidden");
     }
@@ -181,6 +207,7 @@ document.getElementById("btn-create").addEventListener("click", () => {
         }
 
         CurrentRoomName = RoomName.trim();
+        CurrentPassword = Password.trim();
         AutoStart = RoomAutoStart;
         document.getElementById("lobby-title").textContent = `Pokój: ${CurrentRoomName}`;
         document.getElementById("create-error").textContent = "";
@@ -193,6 +220,7 @@ document.getElementById("btn-create").addEventListener("click", () => {
 document.getElementById("btn-close").addEventListener("click", () => {
     Socket.emit("leaveRoom", () => {
         CurrentRoomName = "";
+        CurrentPassword = "";
         AutoStart = false;
         CancelAutoStart();
         ShowScreen(CreateScreen);
@@ -497,6 +525,7 @@ Socket.on("disconnect", () => {
     if (!CurrentRoomName) return;
 
     CurrentRoomName = "";
+    CurrentPassword = "";
     AutoStart = false;
     CancelAutoStart();
     CurrentGame = null;
