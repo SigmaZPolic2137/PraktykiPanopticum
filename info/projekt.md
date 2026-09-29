@@ -1,16 +1,16 @@
 # Zespół
 
-1. **Łukasz Jabłoński** — lider, programista.
-2. **Maksymilian Walczuk** — projektant, grafik, tester.
-3. **Liam Jenees** — programista, tester.
+1. **Łukasz Jabłoński** - lider, programista.
+2. **Maksymilian Walczuk** - projektant, grafik, tester.
+3. **Liam Jenees** - programista, tester.
 
 # Plan projektu
 
 ### Cele na kolejne tygodnie
 
-1. **Prototyp aplikacji** — przygotowanie podstawowej struktury komunikacji pomiędzy serwerem a klientem.
-2. **Wersja beta** — działająca gra, testy oraz praca nad grafiką.
-3. **Wersja finałowa** — ostateczne poprawki i przygotowanie aplikacji do publikacji.
+1. **Prototyp aplikacji** - przygotowanie podstawowej struktury komunikacji pomiędzy serwerem a klientem.
+2. **Wersja beta** - działająca gra, testy oraz praca nad grafiką.
+3. **Wersja finałowa** - ostateczne poprawki i przygotowanie aplikacji do publikacji.
 
 # Wykorzystane technologie
 
@@ -18,22 +18,22 @@ Projekt wykorzystuje **JavaScript** w środowisku **Node.js** oraz bibliotekę *
 
 ## Dlaczego Socket.IO?
 
-1. **Jeden język na frontendzie i backendzie** — wykorzystanie JavaScript upraszcza pracę nad obiema częściami aplikacji.
-2. **Architektura sterowana zdarzeniami (Event-Driven)** — dobrze pasuje do komunikacji w czasie rzeczywistym.
-3. **Gotowe mechanizmy komunikacji** — Socket.IO ułatwia obsługę połączeń, pokoi oraz ponownego łączenia.
-4. **Możliwość dalszego skalowania** — biblioteka może współpracować m.in. z rozwiązaniami opartymi na Redis.
+1. **Jeden język na frontendzie i backendzie** - wykorzystanie JavaScript upraszcza pracę nad obiema częściami aplikacji.
+2. **Architektura sterowana zdarzeniami (Event-Driven)** - dobrze pasuje do komunikacji w czasie rzeczywistym.
+3. **Gotowe mechanizmy komunikacji** - Socket.IO ułatwia obsługę połączeń, pokoi oraz ponownego łączenia.
+4. **Możliwość dalszego skalowania** - biblioteka może współpracować m.in. z rozwiązaniami opartymi na Redis.
 
 ## Alternatywy i powody ich niewybrania
 
-### 1. Python — WebSockets / Django Channels
+### 1. Python - WebSockets / Django Channels
 
 Biblioteka WebSockets zapewnia podstawową komunikację, ale wymaga samodzielnego zaimplementowania większej części mechanizmów potrzebnych w projekcie. Django Channels oferuje więcej funkcji, jednak wymaga bardziej rozbudowanej konfiguracji.
 
-### 2. Java / Spring Boot — WebFlux WebSocket
+### 2. Java / Spring Boot - WebFlux WebSocket
 
 Spring Boot oferuje duże możliwości i dobre wsparcie dla większych projektów. W przypadku tego projektu jego konfiguracja oraz wykorzystanie Project Reactor mogłyby jednak wprowadzić niepotrzebną złożoność.
 
-### 3. PHP — Swoole / Ratchet
+### 3. PHP - Swoole / Ratchet
 
 Rozwiązania te umożliwiają komunikację w czasie rzeczywistym, jednak wymagają dodatkowej konfiguracji środowiska i zostały uznane za mniej wygodne w tym projekcie niż rozwiązanie oparte na Node.js i Socket.IO.
 

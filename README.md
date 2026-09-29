@@ -67,20 +67,20 @@ Pełny opis obsługi znajduje się w [`info/instrukcja.md`](info/instrukcja.md).
 
 ## Dokumentacja
 
-- [`info/instrukcja.md`](info/instrukcja.md) — instrukcja uruchomienia serwera i korzystania z gry.
-- [`info/projekt.md`](info/projekt.md) — skład zespołu, plan projektu, wykorzystane technologie, uzasadnienie wyboru technologii oraz analiza ryzyka.
-- [`info/pytanie.md`](info/pytanie.md) — odpowiedź na pytanie dotyczące jednej z decyzji projektowych.
-- [`info/video/`](info/video/) — materiały wideo zaprezentowane podczas spotkania.
+- [`info/instrukcja.md`](info/instrukcja.md) - instrukcja uruchomienia serwera i korzystania z gry.
+- [`info/projekt.md`](info/projekt.md) - skład zespołu, plan projektu, wykorzystane technologie, uzasadnienie wyboru technologii oraz analiza ryzyka.
+- [`info/pytanie.md`](info/pytanie.md) - odpowiedź na pytanie dotyczące jednej z decyzji projektowych.
+- [`info/video/`](info/video/) - materiały wideo zaprezentowane podczas spotkania.
 
 ## Technologie
 
 Projekt wykorzystuje:
 
-- **JavaScript** — frontend i backend,
-- **Node.js** — środowisko uruchomieniowe serwera,
-- **Express** — obsługa serwera HTTP i plików statycznych,
-- **Socket.IO** — komunikacja w czasie rzeczywistym pomiędzy hostem a graczami,
-- **qrcode-esm** — generowanie kodów QR używanych do dołączania do gry.
+- **JavaScript** - frontend i backend,
+- **Node.js** - środowisko uruchomieniowe serwera,
+- **Express** - obsługa serwera HTTP i plików statycznych,
+- **Socket.IO** - komunikacja w czasie rzeczywistym pomiędzy hostem a graczami,
+- **qrcode-esm** - generowanie kodów QR używanych do dołączania do gry.
 
 Więcej informacji o wyborze technologii i rozważanych alternatywach znajduje się w [`info/projekt.md`](info/projekt.md).
 
