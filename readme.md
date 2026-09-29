@@ -1,24 +1,95 @@
-### helloworld
+# Panopticum
 
-# jak to uruchomić (windows 11 2026 working no virus free):
-1. upewnij się że masz zainstalowany node.js, jeżeli nie pobierz go z tąd: https://nodejs.org/en/download
-2. otwórz wiersz poleceń i przejdz do "[droga do projekty]\src" np: D:\WWW\GithubDesktop\praktyki2\PraktykiPanopticum\src
-3. napisz "node server.js" i kliknij enter, powoinien wyświetlić sie napis "Server running on port 3000."
-4. otwórz przeglądarkę i w pasek adresu wpisz "localhost:3000", powienien wyświetlić sie treść pliku index.html i w konsoli "Device connected!"
-5. jeżeli tak jest to gratulacje a jak nie to pisz do tomasz problem
+Panopticum to wieloosobowa gra działająca w przeglądarce. Serwer obsługuje pokoje oraz komunikację w czasie rzeczywistym pomiędzy ekranem hosta a urządzeniami graczy.
 
-# jak sie połączyć (android chrom):
-1. utwórz nowe okienko wiersza poleceń i wpisz "ipconfig"
-2. doomscrolluj aż znajdziesz segment o nazwie "Wireless LAN adapter Wi-Fi 2" lub podobny (lub ethernet gdy ruter jest bezpośrednio połączony do pc)
-3. na telofonie połącz się z tym samym wifi co jest pc połączony
-4. otwórz przeglądarkę i w pasek adresu spisz "http://ip:3000" gdzie ip jest IPv4 Address z segmentu z drugiego (2) punktu
-5. jeżeli jest tak samo jak po otworzeniu localhosta na pc to całuski
-67. jeżeli strona się długo ładuje lub wyświetla dziwny błąd gdy wpisałeś poprawny adres to pomyśl o zmania na hotspota, może to być wina ustawień rutera
+## Zawartość projektu
 
-### aby otworzyć panel hosta wystarczy dopisać /host.html do adresu na pasku
+```text
+.
+├── src/
+│   ├── server.js          # serwer aplikacji
+│   └── public/            # frontend gry i ekran hosta
+│       ├── index.html     # ekran dołączania gracza
+│       ├── host.html      # ekran hosta
+│       ├── controller.js  # obsługa kontrolera gracza
+│       ├── host.js        # obsługa hosta i lobby
+│       ├── game.js        # logika rozgrywki
+│       └── style.css      # style interfejsu
+│
+└── info/
+    ├── instrukcja.md      # instrukcja uruchomienia i korzystania z gry
+    ├── projekt.md         # informacje o zespole, planie, technologiach i ryzykach
+    ├── pytanie.md         # odpowiedź na pytanie ze spotkania
+    ├── readme.md          # indeks materiałów dodatkowych
+    └── video/             # materiały wideo ze spotkania
+```
 
-*glhf bezrobotni*
+## Uruchomienie
 
-**sprzedaj mi ten hotspot**
+### Wymagania
 
-**przyniosłem własny router**
+- **Node.js**
+- przeglądarka internetowa
+- urządzenia graczy podłączone do tej samej sieci Wi-Fi co komputer hosta, jeżeli gra jest uruchamiana lokalnie
+
+### Instalacja zależności
+
+W projekcie wykorzystywane są m.in. biblioteki **Express**, **Socket.IO** oraz **qrcode-esm**. Jeżeli katalog projektu nie zawiera jeszcze zainstalowanych zależności, należy je zainstalować przed uruchomieniem serwera.
+
+> Jeżeli w dostarczonej wersji projektu brakuje pliku `package.json`, sposób instalacji zależności należy ustalić zgodnie z konfiguracją środowiska używanego do projektu.
+
+### Start serwera
+
+Przejdź do katalogu `src/` i uruchom:
+
+```bash
+node server.js
+```
+
+Po poprawnym uruchomieniu serwera powinien pojawić się komunikat:
+
+```text
+Server running on port 3000.
+```
+
+Następnie na komputerze hosta otwórz:
+
+```text
+http://localhost:3000/
+```
+
+Szczegółową instrukcję znajdziesz w [`info/instrukcja.md`](info/instrukcja.md).
+
+## Jak rozpocząć grę
+
+1. Otwórz stronę gry w przeglądarce.
+2. Na ekranie hosta utwórz pokój i skonfiguruj jego ustawienia.
+3. Na urządzeniach graczy otwórz adres udostępniony przez hosta.
+4. Gracze dołączają do pokoju, podając nazwę oraz hasło, jeżeli jest wymagane.
+5. Host zarządza lobby i rozpoczyna grę.
+6. Urządzenia graczy służą jako kontrolery, a rozgrywka jest wyświetlana na ekranie hosta.
+
+Pełny opis obsługi znajduje się w [`info/instrukcja.md`](info/instrukcja.md).
+
+## Dokumentacja
+
+- [`info/instrukcja.md`](info/instrukcja.md) — instrukcja uruchomienia serwera i korzystania z gry.
+- [`info/projekt.md`](info/projekt.md) — skład zespołu, plan projektu, wykorzystane technologie, uzasadnienie wyboru technologii oraz analiza ryzyka.
+- [`info/pytanie.md`](info/pytanie.md) — odpowiedź na pytanie dotyczące jednej z decyzji projektowych.
+- [`info/video/`](info/video/) — materiały wideo zaprezentowane podczas spotkania.
+
+## Technologie
+
+Projekt wykorzystuje:
+
+- **JavaScript** — frontend i backend,
+- **Node.js** — środowisko uruchomieniowe serwera,
+- **Express** — obsługa serwera HTTP i plików statycznych,
+- **Socket.IO** — komunikacja w czasie rzeczywistym pomiędzy hostem a graczami,
+- **qrcode-esm** — generowanie kodów QR używanych do dołączania do gry.
+
+Więcej informacji o wyborze technologii i rozważanych alternatywach znajduje się w [`info/projekt.md`](info/projekt.md).
+
+## Autorzy
+
+Informacje o składzie zespołu i rolach poszczególnych osób znajdują się w [`info/projekt.md`](info/projekt.md).

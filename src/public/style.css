@@ -65,6 +65,7 @@ input, select {
 input:focus, select:focus {
     outline: none;
     border-color: #1e90ff;
+    transition: border-color 0.15s;
 }
 
 button {
