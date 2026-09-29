@@ -67,10 +67,10 @@ Pełny opis obsługi znajduje się w [`info/instrukcja.md`](info/instrukcja.md).
 
 ## Dokumentacja
 
-- [`info/instrukcja.md`](info/instrukcja.md) - instrukcja uruchomienia serwera i korzystania z gry.
-- [`info/projekt.md`](info/projekt.md) - skład zespołu, plan projektu, wykorzystane technologie, uzasadnienie wyboru technologii oraz analiza ryzyka.
-- [`info/pytanie.md`](info/pytanie.md) - odpowiedź na pytanie dotyczące jednej z decyzji projektowych.
-- [`info/video/`](info/video/) - materiały wideo zaprezentowane podczas spotkania.
+- **[`info/instrukcja.md`](info/instrukcja.md)** - instrukcja uruchomienia serwera oraz korzystania z gry.
+- **[`info/projekt.md`](info/projekt.md)** - skład zespołu, plan projektu, wykorzystane technologie, uzasadnienie ich wyboru oraz analiza ryzyka.
+- **[`info/pytanie.md`](info/pytanie.md)** - odpowiedź na pytanie zadane podczas spotkania.
+- **[`info/video/`](info/video/)** - folder zawierający materiały wideo zaprezentowane podczas spotkania.
 
 ## Technologie
 
