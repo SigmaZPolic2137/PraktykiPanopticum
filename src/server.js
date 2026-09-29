@@ -225,11 +225,10 @@ async function UpdateRoom(RoomName) {
         MaxPlayers: RoomData.MaxPlayers,
 	});
 
-    // Liczba graczy lub stan gry się zmienił, więc lista pokoi na telefonach też.
-    BroadcastRoomList();
+    await BroadcastRoomList();
 }
 
-function CreateRoom(Socket, {RoomName, Password, MaxPlayers, AutoStart}, Callback) {
+async function CreateRoom(Socket, {RoomName, Password, MaxPlayers, AutoStart}, Callback) {
     if (Socket.CurrentRoom) {
         return Callback({
             Success: false,
@@ -282,7 +281,7 @@ function CreateRoom(Socket, {RoomName, Password, MaxPlayers, AutoStart}, Callbac
         Success: true,
     });
 
-    BroadcastRoomList();
+    await BroadcastRoomList();
 }
 
 async function CloseRoom(RoomName) {
@@ -294,7 +293,7 @@ async function CloseRoom(RoomName) {
     const SocketsInRoom = await GetSocketsInRoom(RoomName);
 
     Rooms.delete(RoomName);
-    BroadcastRoomList();
+    await BroadcastRoomList();
 
     const HostSocket = IO.sockets.sockets.get(RoomData.HostID);
     if (HostSocket) {
@@ -570,9 +569,14 @@ async function ListRooms(Callback) {
     Callback(await GetRoomList());
 }
 
-// Telefony dostają nową listę pokoi od razu po każdej zmianie, zamiast pytać serwer co 2 sekundy.
 async function BroadcastRoomList() {
-    IO.emit("roomList", await GetRoomList());
+    const RoomList = await GetRoomList();
+
+    IO.sockets.sockets.forEach((Socket) => {
+        if (!Socket.CurrentRoom) {
+            Socket.emit("roomList", RoomList);
+        }
+    });
 }
 
 // ?:? //
