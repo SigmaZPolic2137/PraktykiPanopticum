@@ -32,12 +32,6 @@ Panopticum to wieloosobowa gra działająca w przeglądarce. Serwer obsługuje p
 - przeglądarka internetowa
 - urządzenia graczy podłączone do tej samej sieci Wi-Fi co komputer hosta, jeżeli gra jest uruchamiana lokalnie
 
-### Instalacja zależności
-
-W projekcie wykorzystywane są m.in. biblioteki **Express**, **Socket.IO** oraz **qrcode-esm**. Jeżeli katalog projektu nie zawiera jeszcze zainstalowanych zależności, należy je zainstalować przed uruchomieniem serwera.
-
-> Jeżeli w dostarczonej wersji projektu brakuje pliku `package.json`, sposób instalacji zależności należy ustalić zgodnie z konfiguracją środowiska używanego do projektu.
-
 ### Start serwera
 
 Przejdź do katalogu `src/` i uruchom:
