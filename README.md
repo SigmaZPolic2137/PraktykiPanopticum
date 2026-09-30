@@ -1,6 +1,6 @@
-# Panopticum
+# PraktykiPanopticum (greg runner)
 
-Panopticum to wieloosobowa gra działająca w przeglądarce. Serwer obsługuje pokoje oraz komunikację w czasie rzeczywistym pomiędzy ekranem hosta a urządzeniami graczy.
+Wieloosobowa gra działająca w przeglądarce. Serwer obsługuje pokoje oraz komunikację w czasie rzeczywistym pomiędzy ekranem hosta a urządzeniami graczy.
 
 ## Zawartość projektu
 
@@ -8,11 +8,11 @@ Panopticum to wieloosobowa gra działająca w przeglądarce. Serwer obsługuje p
 .
 ├── src/
 │   ├── server.js          # serwer aplikacji
-│   └── public/            # frontend gry i ekran hosta
-│       ├── index.html     # ekran dołączania gracza
-│       ├── host.html      # ekran hosta
-│       ├── controller.js  # obsługa kontrolera gracza
-│       ├── host.js        # obsługa hosta i lobby
+│   └── public/            # frontend gry
+│       ├── index.html     # ekran dołączania gracza i kontroler
+│       ├── host.html      # ekran hosta i wyświetlanie rozgrywki
+│       ├── controller.js  # obsługa dołączania i kontrolera gracza
+│       ├── host.js        # obsługa hosta i gry
 │       ├── game.js        # logika rozgrywki
 │       └── style.css      # style interfejsu
 │
